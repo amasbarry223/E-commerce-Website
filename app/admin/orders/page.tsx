@@ -47,10 +47,10 @@ const mockOrders = [
   {
     id: "ORD-001",
     customer: {
-      name: "Sophie Martin",
-      email: "sophie@email.com",
-      phone: "+33 6 12 34 56 78",
-      address: "123 Rue de Paris, 75001 Paris, France",
+      name: "Amadou Diallo",
+      email: "amadou.d@example.com",
+      phone: "+223 76 12 34 56",
+      address: "Rue 100, Porte 20, Hamdallaye, Bamako, Mali",
     },
     items: [
       {
@@ -73,10 +73,10 @@ const mockOrders = [
   {
     id: "ORD-002",
     customer: {
-      name: "Lucas Dubois",
-      email: "lucas@email.com",
-      phone: "+33 6 98 76 54 32",
-      address: "456 Avenue des Champs, 69001 Lyon, France",
+      name: "Mariam Traoré",
+      email: "mariam.t@example.com",
+      phone: "+223 66 98 76 54",
+      address: "Quartier du Fleuve, Avenue de l'Indépendance, Ségou, Mali",
     },
     items: [
       {
@@ -108,10 +108,10 @@ const mockOrders = [
   {
     id: "ORD-003",
     customer: {
-      name: "Emma Bernard",
-      email: "emma@email.com",
-      phone: "+33 6 11 22 33 44",
-      address: "789 Boulevard Saint-Germain, 75006 Paris, France",
+      name: "Bakary Coulibaly",
+      email: "bakary.c@example.com",
+      phone: "+223 70 11 22 33",
+      address: "Hippodrome, Rue 45, Sikasso, Mali",
     },
     items: [
       {
@@ -128,17 +128,17 @@ const mockOrders = [
     status: "shipped",
     paymentStatus: "paid",
     paymentMethod: "Credit Card",
-    trackingNumber: "FR123456789",
+    trackingNumber: "ML123456789",
     createdAt: "2024-01-14T09:15:00",
     updatedAt: "2024-01-15T11:30:00",
   },
   {
     id: "ORD-004",
     customer: {
-      name: "Thomas Petit",
-      email: "thomas@email.com",
-      phone: "+33 6 55 66 77 88",
-      address: "321 Rue Victor Hugo, 33000 Bordeaux, France",
+      name: "Fatoumata Konaté",
+      email: "fatoumata.k@example.com",
+      phone: "+223 60 55 66 77",
+      address: "Niamakoro, Avenue Cheick Zayed, Kayes, Mali",
     },
     items: [
       {
@@ -161,10 +161,10 @@ const mockOrders = [
   {
     id: "ORD-005",
     customer: {
-      name: "Julie Roux",
-      email: "julie@email.com",
-      phone: "+33 6 99 88 77 66",
-      address: "654 Avenue Jean Jaures, 13001 Marseille, France",
+      name: "Moussa Keïta",
+      email: "moussa.k@example.com",
+      phone: "+223 75 99 88 77",
+      address: "Daoudabougou, Rue 250, Mopti, Mali",
     },
     items: [
       {
@@ -187,10 +187,10 @@ const mockOrders = [
   {
     id: "ORD-006",
     customer: {
-      name: "Pierre Durand",
-      email: "pierre@email.com",
-      phone: "+33 6 44 33 22 11",
-      address: "987 Rue de la Republique, 59000 Lille, France",
+      name: "Aïcha Sylla",
+      email: "aicha.s@example.com",
+      phone: "+223 69 44 33 22",
+      address: "Sabourou, Route de Koulouba, Gao, Mali",
     },
     items: [
       {
@@ -432,7 +432,7 @@ export default function OrdersPage() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <span className="font-medium text-sm">${order.total}</span>
+                        <span className="font-medium text-sm">FCFA {order.total}</span>
                       </td>
                       <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -562,7 +562,7 @@ export default function OrdersPage() {
                           <p className="text-xs text-muted-foreground">Qté : {item.quantity}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-sm">${item.price * item.quantity}</p>
+                          <p className="font-semibold text-sm">FCFA {item.price * item.quantity}</p>
                         </div>
                       </div>
                     ))}
@@ -634,7 +634,7 @@ export default function OrdersPage() {
                 {/* Total */}
                 <div className="flex items-center justify-between pt-4 border-t border-border">
                   <span className="text-lg font-semibold">Total</span>
-                  <span className="text-2xl font-bold">${selectedOrder.total}</span>
+                  <span className="text-2xl font-bold">FCFA {selectedOrder.total}</span>
                 </div>
 
                 {/* Actions */}

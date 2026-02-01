@@ -365,13 +365,13 @@ export default function CouponsPage() {
                           ) : (
                             <>
                               <DollarSign className="w-4 h-4 text-muted-foreground" />
-                              <span className="font-medium">${coupon.value} de réduction</span>
+                              <span className="font-medium">FCFA {coupon.value} de réduction</span>
                             </>
                           )}
                         </div>
                         {coupon.minPurchase > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            Min. ${coupon.minPurchase} d&apos;achat
+                            Min. FCFA {coupon.minPurchase} d&apos;achat
                           </p>
                         )}
                       </td>
@@ -520,7 +520,7 @@ export default function CouponsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percentage">Pourcentage (%)</SelectItem>
-                    <SelectItem value="fixed">Montant fixe ($)</SelectItem>
+                    <SelectItem value="fixed">Montant fixe (FCFA)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -538,7 +538,7 @@ export default function CouponsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minPurchase">Achat min. ($)</Label>
+                <Label htmlFor="minPurchase">Achat min. (FCFA)</Label>
                 <Input
                   id="minPurchase"
                   type="number"

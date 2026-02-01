@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image";
 import Link from "next/link"
 import { useState } from "react"
 import { motion } from "framer-motion"
@@ -13,16 +14,29 @@ import {
 } from "@/components/ui/sheet"
 import { useCart } from "@/context/cart-context"
 
+import { useRouter } from "next/navigation" // Import useRouter
+import { useAuth } from "@/context/auth-context" // Import useAuth
+
 const navLinks = [
   { name: "Boutique", href: "/shop" },
-  { name: "Homme", href: "/shop?category=men" },
-  { name: "Femme", href: "/shop?category=women" },
+  { name: "Homme", href: "/shop?category=homme" },
+  { name: "Femme", href: "/shop?category=femme" },
   { name: "Nouveautés", href: "/shop?filter=new" },
 ]
 
 export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { totalItems } = useCart()
+  const { user } = useAuth() // Utiliser le hook useAuth
+  const router = useRouter() // Utiliser le hook useRouter
+
+  const handleProfileClick = () => {
+    if (user) {
+      router.push("/account/dashboard") // Rediriger vers le dashboard si connecté
+    } else {
+      router.push("/login") // Rediriger vers la page de connexion si non connecté
+    }
+  }
 
   return (
     <>
@@ -68,7 +82,13 @@ export function Header() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <span className="text-xl font-bold tracking-tight lg:text-2xl">Nextgen</span>
+            <Image
+              src="/logo.png"
+              alt="Tonomi Logo"
+              width={196}
+              height={56}
+              className="h-14 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}
@@ -115,11 +135,9 @@ export function Header() {
               </Button>
             </Link>
 
-            <Link href="/account">
-              <Button variant="ghost" size="icon" aria-label="Compte">
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" aria-label="Compte" onClick={handleProfileClick}>
+              <User className="h-5 w-5" />
+            </Button>
 
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative" aria-label="Panier">

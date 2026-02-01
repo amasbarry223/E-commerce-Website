@@ -1,98 +1,148 @@
-"use client"
-
+import { supabase } from '@/lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getOrders, saveOrders, initializeStorage } from '@/lib/storage'
-import type { MockOrder } from '@/lib/mock-data'
+
+export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'refunded';
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  size?: string;
+  color?: string;
+  image?: string;
+  product_name?: string; // Derived from product_id join
+}
+
+export interface CustomerDetails {
+  name: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+}
 
 export interface Order {
   id: string
-  customer: {
-    name: string
-    email: string
-    phone?: string | null
-    address?: string | null
-  }
-  items: Array<{
-    id: string
-    name: string
-    price: number
-    quantity: number
-    size?: string
-    color?: string
-    image: string
-  }>
+  user_id: string;
+  customer_details: CustomerDetails; // JSONB field
   total: number
-  status: string
-  paymentStatus: string
-  paymentMethod?: string
-  trackingNumber?: string
-  createdAt: string
-  updatedAt: string
+  status: OrderStatus;
+  payment_status: PaymentStatus;
+  payment_method?: string
+  tracking_number?: string
+  created_at: string
+  updated_at: string
+  order_items: OrderItem[]; // Nested relation
 }
 
-export function useOrders(status?: string) {
+export function useOrders(statusFilter?: OrderStatus) {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrders()
-  }, [status])
+  }, [statusFilter])
 
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 200))
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            price,
+            size,
+            color,
+            image,
+                      products (name)
+                    )        `)
+        .order('created_at', { ascending: false })
 
-      initializeStorage()
-      let allOrders = getOrders()
-
-      // Filtrer par statut
-      if (status && status !== 'ALL') {
-        allOrders = allOrders.filter(o => o.status === status)
+      if (statusFilter && statusFilter !== 'ALL') {
+        query = query.eq('status', statusFilter)
       }
 
-      setOrders(allOrders)
+      const { data, error: fetchError } = await query
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      const transformedOrders: Order[] = data.map((order: any) => ({
+        ...order,
+        items: order.order_items.map((item: any) => ({
+          ...item,
+          product_name: item.products?.name
+        }))
+      }));
+
+
+      setOrders(transformedOrders)
       setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des commandes')
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des commandes')
     } finally {
       setLoading(false)
     }
   }
 
-  const updateOrderStatus = async (orderId: string, status: string, trackingNumber?: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, trackingNumber?: string) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
+      const updateData: { status: OrderStatus; tracking_number?: string; updated_at: string } = {
+        status: newStatus,
+        updated_at: new Date().toISOString(), // Supabase might handle this via trigger, but explicit is safer
+      }
+      if (trackingNumber) {
+        updateData.tracking_number = trackingNumber
+      }
 
-      const allOrders = getOrders()
-      const index = allOrders.findIndex(o => o.id === orderId)
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId)
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            price,
+            size,
+            color,
+            image,
+            products (name)
+          )
+        `)
+        .single()
       
-      if (index === -1) {
-        throw new Error('Commande non trouvée')
+      if (error) {
+        throw error
       }
 
-      const updatedOrder: MockOrder = {
-        ...allOrders[index],
-        status: status as any,
-        trackingNumber: trackingNumber || allOrders[index].trackingNumber,
-        updatedAt: new Date().toISOString(),
-      }
-
-      allOrders[index] = updatedOrder
-      saveOrders(allOrders)
+      const transformedUpdatedOrder: Order = {
+        ...data,
+        items: data.order_items.map((item: any) => ({
+          ...item,
+          product_name: item.products?.name
+        }))
+      };
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? updatedOrder : o))
+        prev.map((o) => (o.id === orderId ? transformedUpdatedOrder : o))
       )
       toast.success('Commande mise à jour avec succès')
-      return updatedOrder
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erreur lors de la mise à jour')
-      throw error
+      return transformedUpdatedOrder
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la mise à jour de la commande')
+      throw err
     }
   }
 

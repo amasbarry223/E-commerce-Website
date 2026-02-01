@@ -8,6 +8,8 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation" // Import useRouter
+import { useAuth } from "@/context/auth-context" // Import useAuth
 
 const menuItems = [
   { id: "profile", label: "Mon profil", icon: User },
@@ -82,6 +84,29 @@ const orders = [
 
 export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState("orders")
+  const { user, loading, logout } = useAuth() // Utiliser le hook useAuth et récupérer logout
+  const router = useRouter() // Initialiser le hook useRouter
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Chargement du tableau de bord...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Vous devez être connecté pour accéder à cette page.</p>
+        <Link href="/login">Se connecter</Link>
+      </div>
+    );
+  }
+
+  // Si le nom complet est disponible, le diviser pour prénom et nom
+  const firstName = user.name?.split(' ')[0] || user.email?.split('@')[0] || 'Utilisateur';
+  const lastName = user.name?.split(' ').slice(1).join(' ') || '';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -99,15 +124,15 @@ export default function DashboardPage() {
               <div className="flex items-center gap-4 mb-6 p-4 bg-secondary rounded-2xl">
                 <div className="relative w-14 h-14 rounded-full overflow-hidden">
                   <Image
-                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2070&auto=format&fit=crop"
-                    alt="User avatar"
+                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2070&auto=format&fit=crop" // Placeholder avatar
+                    alt={user.name || "User avatar"}
                     fill
                     className="object-cover"
                   />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">John Doe</h3>
-                  <p className="text-sm text-muted-foreground">john@example.com</p>
+                  <h3 className="font-semibold text-foreground">{user.name || 'Utilisateur'}</h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
               </div>
 
@@ -132,6 +157,11 @@ export default function DashboardPage() {
                 <Link
                   href="/account"
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-500 hover:bg-red-50 transition-colors"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    await logout();
+                    router.push("/login");
+                  }}
                 >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Se déconnecter</span>
@@ -141,7 +171,13 @@ export default function DashboardPage() {
 
             {/* Content */}
             <div className="lg:col-span-3">
-              {activeSection === "profile" && <ProfileSection />}
+              {activeSection === "profile" && (
+                <ProfileSection
+                  user={user}
+                  firstName={firstName}
+                  lastName={lastName}
+                />
+              )}
               {activeSection === "orders" && <OrdersSection orders={orders} />}
               {activeSection === "wishlist" && <WishlistSection />}
               {activeSection === "addresses" && <AddressesSection />}
@@ -156,26 +192,31 @@ export default function DashboardPage() {
   )
 }
 
-function ProfileSection() {
+function ProfileSection({ user, firstName, lastName }: { user: any, firstName: string, lastName: string }) {
+  // Ici, nous supposons que user.name est le nom complet, et user.email est l'e-mail.
+  // user.phone ou user.address nécessiteraient d'être ajoutés à l'interface User et au fetch du profil
+  // dans auth-context.tsx pour être dynamiques. Pour l'instant, on utilise des placeholders si non dispo.
+  const userPhone = user.phone || "+223 76 12 34 56"; // Placeholder ou à récupérer si disponible
+
   return (
     <div className="bg-secondary rounded-2xl p-6">
       <h2 className="text-xl font-semibold text-foreground mb-6">Informations du profil</h2>
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm text-muted-foreground mb-1">Prénom</label>
-          <p className="font-medium text-foreground">John</p>
+          <p className="font-medium text-foreground">{firstName}</p>
         </div>
         <div>
           <label className="block text-sm text-muted-foreground mb-1">Nom</label>
-          <p className="font-medium text-foreground">Doe</p>
+          <p className="font-medium text-foreground">{lastName}</p>
         </div>
         <div>
           <label className="block text-sm text-muted-foreground mb-1">E-mail</label>
-          <p className="font-medium text-foreground">john@example.com</p>
+          <p className="font-medium text-foreground">{user.email}</p>
         </div>
         <div>
           <label className="block text-sm text-muted-foreground mb-1">Téléphone</label>
-          <p className="font-medium text-foreground">+1 234 567 890</p>
+          <p className="font-medium text-foreground">{userPhone}</p>
         </div>
       </div>
       <Button className="mt-6 rounded-full bg-foreground text-background hover:bg-foreground/90">
@@ -209,7 +250,7 @@ function OrdersSection({ orders }: { orders: typeof orders }) {
               >
                 {order.status}
               </span>
-              <span className="font-semibold text-foreground">${order.total}</span>
+              <span className="font-semibold text-foreground">FCFA {order.total}</span>
             </div>
           </div>
           <div className="space-y-3">
@@ -229,7 +270,7 @@ function OrdersSection({ orders }: { orders: typeof orders }) {
                     Taille : {item.size} | Couleur : {item.color}
                   </p>
                 </div>
-                <p className="font-medium text-foreground">${item.price}</p>
+                <p className="font-medium text-foreground">FCFA {item.price}</p>
               </div>
             ))}
           </div>
@@ -271,12 +312,11 @@ function AddressesSection() {
         <div className="flex items-start justify-between">
           <div>
             <p className="font-medium text-foreground">Domicile</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              123 Fashion Street<br />
-              New York, NY 10001<br />
-              États-Unis
-            </p>
-          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Rue 100, Porte 20<br />
+                            Hamdallaye ACI 2000<br />
+                            Bamako, Mali
+                          </p>          </div>
           <span className="px-2 py-1 bg-foreground text-background text-xs font-medium rounded">
             Par défaut
           </span>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -55,46 +55,46 @@ const stats = [
 const recentOrders = [
   {
     id: "ORD-001",
-    customer: "Sophie Martin",
-    email: "sophie@email.com",
-    product: "Modern Blazer",
-    amount: "$125.00",
+    customer: "Amadou Diallo",
+    email: "amadou.d@example.com",
+    product: "Boubou Élégant",
+    amount: "FCFA 45,000",
     status: "completed",
     date: "2024-01-15",
   },
   {
     id: "ORD-002",
-    customer: "Lucas Dubois",
-    email: "lucas@email.com",
-    product: "Premium Jacket",
-    amount: "$189.00",
+    customer: "Mariam Traoré",
+    email: "mariam.t@example.com",
+    product: "Pagne Bogolan",
+    amount: "FCFA 30,000",
     status: "processing",
     date: "2024-01-15",
   },
   {
     id: "ORD-003",
-    customer: "Emma Bernard",
-    email: "emma@email.com",
-    product: "Running Sneakers",
-    amount: "$165.00",
+    customer: "Bakary Coulibaly",
+    email: "bakary.c@example.com",
+    product: "Chaussures Traditionnelles",
+    amount: "FCFA 25,000",
     status: "shipped",
     date: "2024-01-14",
   },
   {
     id: "ORD-004",
-    customer: "Thomas Petit",
-    email: "thomas@email.com",
-    product: "Classic White Tee",
-    amount: "$45.00",
+    customer: "Fatoumata Konaté",
+    email: "fatoumata.k@example.com",
+    product: "T-shirt Coton Bio",
+    amount: "FCFA 10,000",
     status: "pending",
     date: "2024-01-14",
   },
   {
     id: "ORD-005",
-    customer: "Julie Roux",
-    email: "julie@email.com",
-    product: "Leather Boots",
-    amount: "$225.00",
+    customer: "Moussa Keïta",
+    email: "moussa.k@example.com",
+    product: "Bijoux Touareg",
+    amount: "FCFA 75,000",
     status: "completed",
     date: "2024-01-13",
   },
@@ -103,31 +103,31 @@ const recentOrders = [
 const topProducts = [
   {
     id: 1,
-    name: "Modern Blazer",
+    name: "Boubou Élégant",
     image: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=200&auto=format&fit=crop",
     sales: 245,
-    revenue: "$30,625",
+    revenue: "FCFA 450,000",
   },
   {
     id: 2,
-    name: "Premium Jacket",
+    name: "Pagne Bogolan",
     image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=200&auto=format&fit=crop",
     sales: 189,
-    revenue: "$35,721",
+    revenue: "FCFA 300,000",
   },
   {
     id: 3,
-    name: "Running Sneakers",
+    name: "Chaussures Traditionnelles",
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=200&auto=format&fit=crop",
     sales: 156,
-    revenue: "$25,740",
+    revenue: "FCFA 250,000",
   },
   {
     id: 4,
-    name: "Classic White Tee",
+    name: "T-shirt Coton Bio",
     image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=200&auto=format&fit=crop",
     sales: 312,
-    revenue: "$14,040",
+    revenue: "FCFA 100,000",
   },
 ]
 
@@ -139,82 +139,84 @@ const statusStyles: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 }
 
+
+
 export default function AdminDashboard() {
-  const [period, setPeriod] = useState("7d")
-  const [analytics, setAnalytics] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState("7d") // This can now be used to filter data if needed, but not implemented for now
+  // Analytics are now derived directly from hooks, no separate state needed for `analytics`
+  // const [analytics, setAnalytics] = useState<any>(null)
+  // const [loading, setLoading] = useState(true) // Loading now comes from individual hooks
 
-  const { orders } = useOrders()
-  const { products } = useProducts()
-  const { customers } = useCustomers()
+  const { orders, loading: ordersLoading } = useOrders()
+  const { products, loading: productsLoading } = useProducts()
+  const { customers, loading: customersLoading } = useCustomers()
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [period])
+  const loading = ordersLoading || productsLoading || customersLoading; // Combined loading state
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
+  // Derived analytics from real-time data
+  const { totalRevenue, totalOrders, totalCustomers, topProductsCalculated } = useMemo(() => {
+    let revenue = 0;
+    let numOrders = 0;
+    let numCustomers = customers.length;
+    let productSales: { [productId: string]: { sales: number; revenue: number; product: any } } = {};
 
-      // Calculer les analytics depuis les données locales
-      const { getOrders, getProducts, getCustomers, initializeStorage } = await import('@/lib/storage')
-      initializeStorage()
-
-      const allOrders = getOrders()
-      const allProducts = getProducts()
-      const allCustomers = getCustomers()
-
-      // Calculer le revenu total
-      const totalRevenue = allOrders
-        .filter(o => o.paymentStatus === 'paid')
-        .reduce((sum, o) => sum + o.total, 0)
-
-      // Calculer les stats
-      const analyticsData = {
-        stats: {
-          totalRevenue,
-          totalOrders: allOrders.length,
-          totalCustomers: allCustomers.length,
-        },
-        recentOrders: allOrders.slice(0, 5),
-        topProducts: allProducts.slice(0, 5).map(p => ({
-          id: p.id,
-          name: p.name,
-          revenue: p.price * (p.reviews || 0) * 0.1, // Estimation
-          sales: Math.floor((p.reviews || 0) * 0.1), // Estimation des ventes
-          image: p.images?.[0] || "/placeholder.svg",
-        })),
+    orders.forEach(order => {
+      // Assuming 'paid' orders contribute to revenue
+      if (order.payment_status === 'paid') {
+        revenue += order.total;
+        numOrders++;
       }
+      order.order_items.forEach(item => {
+        // Find the product from the products array for details, or use item.product_name
+        const productDetail = products.find(p => p.id === item.product_id);
+        
+        if (!productSales[item.product_id]) {
+          productSales[item.product_id] = { sales: 0, revenue: 0, product: productDetail };
+        }
+        productSales[item.product_id].sales += item.quantity;
+        productSales[item.product_id].revenue += item.quantity * parseFloat(item.price.toString()); // Ensure price is number
+      });
+    });
 
-      setAnalytics(analyticsData)
-    } catch (error) {
-      console.error('Failed to fetch analytics:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    const topProductsSorted = Object.values(productSales)
+      .sort((a, b) => b.sales - a.sales) // Sort by sales
+      .slice(0, 4) // Take top 4
+      .map(item => ({
+        id: item.product?.id || `product-${item.product?.name}`, // Fallback ID
+        name: item.product?.name,
+        image: item.product?.images?.[0] || "/placeholder.svg",
+        sales: item.sales,
+        revenue: item.revenue,
+      }));
+
+
+    return {
+      totalRevenue: revenue,
+      totalOrders: numOrders,
+      totalCustomers: numCustomers,
+      topProductsCalculated: topProductsSorted,
+    };
+  }, [orders, products, customers]); // Recalculate when dependencies change
 
   // Calculate stats from real data
-  const stats = analytics ? [
+  const stats = [
     {
       title: "Revenu total",
-      value: `$${analytics.stats.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: `FCFA ${Number(totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: "+0%", // You can calculate this from previous period
       trend: "up" as const,
       icon: DollarSign,
     },
     {
       title: "Commandes",
-      value: analytics.stats.totalOrders.toLocaleString(),
+      value: totalOrders.toLocaleString(),
       change: "+0%",
       trend: "up" as const,
       icon: ShoppingCart,
     },
     {
       title: "Clients",
-      value: analytics.stats.totalCustomers.toLocaleString(),
+      value: totalCustomers.toLocaleString(),
       change: "+0%",
       trend: "up" as const,
       icon: Users,
@@ -226,55 +228,21 @@ export default function AdminDashboard() {
       trend: "up" as const,
       icon: Package,
     },
-  ] : [
-    {
-      title: "Revenu total",
-      value: "$0.00",
-      change: "+0%",
-      trend: "up" as const,
-      icon: DollarSign,
-    },
-    {
-      title: "Commandes",
-      value: "0",
-      change: "+0%",
-      trend: "up" as const,
-      icon: ShoppingCart,
-    },
-    {
-      title: "Clients",
-      value: "0",
-      change: "+0%",
-      trend: "up" as const,
-      icon: Users,
-    },
-    {
-      title: "Produits",
-      value: "0",
-      change: "+0%",
-      trend: "up" as const,
-      icon: Package,
-    },
   ]
 
   // Get recent orders
   const recentOrders = orders.slice(0, 5).map((order) => ({
     id: order.id,
-    customer: order.customer.name,
-    email: order.customer.email,
-    product: order.items[0]?.name || "Multiple items",
-    amount: `$${order.total.toFixed(2)}`,
+    customer: order.customer_details?.name || "N/A", // Use customer_details
+    email: order.customer_details?.email || "N/A", // Use customer_details
+    product: order.order_items[0]?.product_name || "Multiple items", // Use product_name from order_items
+    amount: `FCFA ${order.total.toFixed(2)}`,
     status: order.status,
-    date: new Date(order.createdAt).toLocaleDateString(),
+    date: new Date(order.created_at).toLocaleDateString(), // Use created_at
   }))
 
   // Get top products from analytics
-  const topProducts = analytics?.topProducts?.slice(0, 4).map((product: any, index: number) => ({
-    ...product,
-    id: product.id || product.name || `product-${index}`,
-    image: product.image || "/placeholder.svg",
-  })) || []
-
+  const topProducts = topProductsCalculated;
 
   return (
     <div className="space-y-6">
@@ -337,9 +305,10 @@ export default function AdminDashboard() {
           ))}
         </div>
       )}
-
+    
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         {/* Recent orders */}
         <Card className="lg:col-span-2 border-0 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -404,7 +373,7 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="py-3 px-2 text-right">
-                        <span className="font-medium text-sm">{order.amount}</span>
+                        <span className="font-medium text-sm">FCFA {order.amount}</span>
                       </td>
                     </tr>
                     ))
@@ -446,7 +415,7 @@ export default function AdminDashboard() {
                       <p className="text-xs text-muted-foreground">{product.sales || 0} ventes</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-sm">${(product.revenue || 0).toLocaleString()}</p>
+                      <p className="font-semibold text-sm">FCFA {Number(product.revenue || 0).toLocaleString()}</p>
                     </div>
                   </div>
                 ))

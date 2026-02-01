@@ -30,10 +30,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent 
-        className={cn("max-h-[96vh]", !isMobile && "max-w-md")}
-        direction={isMobile ? "bottom" : "right"}
-      >
+      <DrawerContent className="max-h-[96vh]">
         <DrawerHeader className="border-b">
           <div className="flex items-center justify-between">
             <div>
@@ -113,7 +110,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     <Link href={`/product/${item.product.id}`} onClick={onClose}>
                       <div className="relative w-20 h-24 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
-                          src={item.product.images[0] || "/placeholder.svg"}
+                          src={item.product.images[0] && item.product.images[0] !== '' ? item.product.images[0] : "/placeholder.svg"}
                           alt={item.product.name}
                           fill
                           className="object-cover"

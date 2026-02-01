@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 import { Eye, EyeOff, Mail, Lock, Loader2, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,12 +15,19 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { login, user, loading: authLoading } = useAuth()
+
+  useEffect(() => {
+    // Si l'utilisateur est déjà connecté et est un admin, rediriger
+    if (user && user.role === 'admin') {
+      router.push("/admin")
+    }
+  }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    // Nettoyer les espaces
     const cleanEmail = email.trim()
     const cleanPassword = password.trim()
 
@@ -29,49 +37,37 @@ export default function AdminLoginPage() {
       return
     }
 
-    try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 500))
+    const { success, error } = await login(cleanEmail, cleanPassword)
 
-      // Utiliser le service de stockage
-      const { getUsers, setCurrentUser, initializeStorage } = await import('@/lib/storage')
-      initializeStorage()
-
-      const users = getUsers()
-      const foundUser = users.find(u => u.email === cleanEmail && u.password === cleanPassword)
-
-      if (!foundUser) {
-        toast.error("Email ou mot de passe incorrect")
-        setLoading(false)
-        return
-      }
-
-      // Vérifier que l'utilisateur est admin
-      if (foundUser.role !== 'admin') {
-        toast.error("Accès réservé aux administrateurs")
-        setLoading(false)
-        return
-      }
-
-      // Stocker l'utilisateur connecté
-      setCurrentUser(foundUser)
-
-      toast.success("Connexion réussie !")
-      router.push("/admin")
-    } catch (error: any) {
-      console.error('Login error:', error)
-      toast.error(error?.message || "Erreur de connexion")
-    } finally {
-      setLoading(false)
+    if (success) {
+      // Le useEffect gérera la redirection si l'utilisateur est admin.
+      // Nous devons attendre que l'état de l'utilisateur soit mis à jour.
+      // Une vérification supplémentaire peut être faite ici si nécessaire.
+      toast.success("Vérification en cours...")
+    } else {
+      toast.error(error || "Email ou mot de passe incorrect")
     }
+
+    setLoading(false)
   }
+  
+  // Un petit effet pour vérifier le rôle après la mise à jour de l'utilisateur
+  useEffect(() => {
+    if (!authLoading && user) {
+        if(user.role === 'admin') {
+            toast.success("Connexion réussie ! Redirection...")
+            router.push("/admin")
+        } else {
+            toast.error("Accès réservé aux administrateurs")
+        }
+    }
+  }, [user, authLoading, router])
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20 p-4">
       <div className="w-full max-w-md">
-        {/* Card */}
         <div className="bg-card border border-border rounded-2xl shadow-xl p-8 space-y-6">
-          {/* Header */}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
               <Shield className="w-8 h-8 text-primary" />
@@ -82,7 +78,6 @@ export default function AdminLoginPage() {
             </p>
           </div>
 
-          {/* Form */}
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
@@ -133,7 +128,7 @@ export default function AdminLoginPage() {
               disabled={loading}
               className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-lg h-11 font-medium"
             >
-              {loading ? (
+              {loading || authLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Connexion en cours...
@@ -144,9 +139,8 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          {/* Footer note */}
           <p className="text-xs text-center text-muted-foreground pt-4 border-t border-border">
-            Accès réservé aux administrateurs autorisés
+            Accès réservé aux administrateateurs autorisés
           </p>
         </div>
       </div>

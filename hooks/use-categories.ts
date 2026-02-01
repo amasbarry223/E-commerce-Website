@@ -1,9 +1,6 @@
-"use client"
-
+import { supabase } from '@/lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getCategories, saveCategories, getProducts, generateId, initializeStorage } from '@/lib/storage'
-import type { MockCategory } from '@/lib/mock-data'
 
 export interface Category {
   id: string
@@ -11,10 +8,10 @@ export interface Category {
   slug: string
   description: string | null
   image: string | null
-  isActive: boolean
-  productCount?: number
-  createdAt: string
-  updatedAt: string
+  is_active: boolean // Ajout pour correspondre au schéma DB
+  created_at: string
+  updated_at: string
+  product_count?: number // Valeur dérivée/agrégée, facultative
 }
 
 export function useCategories() {
@@ -29,99 +26,86 @@ export function useCategories() {
   const fetchCategories = async () => {
     try {
       setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 200))
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true })
 
-      initializeStorage()
-      let allCategories = getCategories()
-      const products = getProducts()
+      if (categoriesError) {
+        throw categoriesError
+      }
 
-      // Calculer le nombre de produits par catégorie
-      allCategories = allCategories.map(cat => ({
+      // Initialize product_count to 0 as it's a derived value not directly from DB
+      const categoriesWithProductCount = (categoriesData || []).map(cat => ({
         ...cat,
-        productCount: products.filter(p => p.categoryId === cat.id).length,
-      }))
+        product_count: 0 // Placeholder: actual count would require a separate query/RPC
+      }));
 
-      setCategories(allCategories)
+      setCategories(categoriesWithProductCount);
       setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des catégories')
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des catégories')
     } finally {
       setLoading(false)
     }
   }
 
-  const createCategory = async (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'productCount'>) => {
+  const createCategory = async (categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at' | 'product_count'>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const newCategory: MockCategory = {
-        id: generateId('cat'),
-        ...categoryData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const { name, slug, description, image, is_active } = categoryData; // Destructure to map
+      const { data, error } = await supabase.from('categories').insert({
+        name, slug, description, image, is_active
+      }).select().single()
+      if (error) {
+        throw error
       }
-
-      const allCategories = getCategories()
-      allCategories.unshift(newCategory)
-      saveCategories(allCategories)
-      setCategories((prev) => [{ ...newCategory, productCount: 0 }, ...prev])
-      
+      setCategories((prev) => [{ ...data, product_count: 0 }, ...prev]) // Ajouter avec product_count 0 initial
       toast.success('Catégorie créée avec succès')
-      return newCategory
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la création de la catégorie')
+      return data
+    } catch (err: any) {
+      console.error("Erreur lors de la création de la catégorie:", err); // Ajout d'un log
+      throw new Error(err.message || 'Erreur lors de la création de la catégorie')
     }
   }
 
   const updateCategory = async (id: string, categoryData: Partial<Category>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allCategories = getCategories()
-      const index = allCategories.findIndex(c => c.id === id)
+      const { is_active, ...rest } = categoryData;
+      const dataToUpdate: Partial<Omit<Category, 'product_count'>> = { ...rest };
+      if (typeof is_active === 'boolean') {
+        dataToUpdate.is_active = is_active;
+      }
       
-      if (index === -1) {
-        throw new Error('Catégorie non trouvée')
+      const { data, error } = await supabase.from('categories').update(dataToUpdate).eq('id', id).select().single()
+      if (error) {
+        throw error
       }
-
-      const updatedCategory: MockCategory = {
-        ...allCategories[index],
-        ...categoryData,
-        updatedAt: new Date().toISOString(),
+      const updatedCategoryWithCount = { 
+        ...data, 
+        product_count: (categories.find(c => c.id === id)?.product_count || 0) 
       }
-
-      allCategories[index] = updatedCategory
-      saveCategories(allCategories)
-
-      const products = getProducts()
-      const productCount = products.filter(p => p.categoryId === id).length
-
       setCategories((prev) =>
-        prev.map((c) => (c.id === id ? { ...updatedCategory, productCount } : c))
+        prev.map((c) => (c.id === id ? updatedCategoryWithCount : c))
       )
       toast.success('Catégorie mise à jour avec succès')
-      return updatedCategory
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour de la catégorie')
+      return data
+    } catch (err: any) {
+      console.error("Erreur lors de la mise à jour de la catégorie:", err); // Ajout d'un log
+      throw new Error(err.message || 'Erreur lors de la mise à jour de la catégorie')
     }
   }
 
   const deleteCategory = async (id: string) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allCategories = getCategories()
-      const filtered = allCategories.filter(c => c.id !== id)
-      saveCategories(filtered)
-
+      const { error } = await supabase.from('categories').delete().eq('id', id)
+      if (error) {
+        throw error
+      }
       setCategories((prev) => prev.filter((c) => c.id !== id))
       toast.success('Catégorie supprimée avec succès')
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la suppression de la catégorie')
+    } catch (err: any) {
+      console.error("Erreur lors de la suppression de la catégorie:", err); // Ajout d'un log
+      throw new Error(err.message || 'Erreur lors de la suppression de la catégorie')
     }
   }
 

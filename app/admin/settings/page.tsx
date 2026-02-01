@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabaseClient"
+import { useToast } from "@/hooks/use-toast"
 import {
   Store,
   CreditCard,
@@ -9,7 +11,6 @@ import {
   Shield,
   Globe,
   Mail,
-  Palette,
   Save,
   Check,
 } from "lucide-react"
@@ -29,21 +30,36 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
-export default function SettingsPage() {
-  const [saved, setSaved] = useState(false)
-  
-  // Store settings
-  const [storeSettings, setStoreSettings] = useState({
-    name: "Nextgen",
-    email: "contact@nextgen.com",
-    phone: "+33 1 23 45 67 89",
-    address: "123 Fashion Street, Paris, France",
-    description: "Mode de qualité qui reflète votre style et rend chaque jour agréable.",
-    currency: "EUR",
-    timezone: "Europe/Paris",
-  })
+// Type pour les paramètres généraux, correspondant à la table Supabase
+type StoreSettings = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  description: string | null;
+  currency: string | null;
+  timezone: string | null;
+  notification_settings: any | null; // Ajouté pour les données JSONB
+  shipping_settings: any | null;     // Ajouté pour les données JSONB
+  payment_settings: any | null;      // Ajouté pour les données JSONB
+  updated_at: string | null;
+};
 
-  // Notification settings
+export default function SettingsPage() {
+  const { toast } = useToast()
+  const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // --- ÉTATS DU COMPOSANT ---
+
+  // Paramètres généraux de la boutique (dynamiques)
+  const [storeSettings, setStoreSettings] = useState<Partial<StoreSettings>>({})
+
+  // NOTE: Les états suivants sont statiques pour l'instant.
+  // Ils pourraient être déplacés dans des colonnes JSONB dans la table store_settings à l'avenir.
+
+  // Paramètres de notification
   const [notifications, setNotifications] = useState({
     orderConfirmation: true,
     orderShipped: true,
@@ -51,9 +67,10 @@ export default function SettingsPage() {
     newCustomer: true,
     lowStock: true,
     weeklyReport: false,
+    lowStockThreshold: 10, // Nouveau champ
   })
 
-  // Shipping settings
+  // Paramètres d'expédition (statiques)
   const [shipping, setShipping] = useState({
     freeShippingThreshold: "50",
     standardRate: "5.99",
@@ -61,7 +78,7 @@ export default function SettingsPage() {
     internationalRate: "19.99",
   })
 
-  // Payment settings
+  // Paramètres de paiement (statiques)
   const [payment, setPayment] = useState({
     stripEnabled: true,
     paypalEnabled: true,
@@ -69,14 +86,81 @@ export default function SettingsPage() {
     testMode: false,
   })
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  // --- EFFETS ---
+
+  // Charger les paramètres depuis Supabase au montage du composant
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("*")
+        .eq("id", 1)
+        .single()
+
+      if (error) {
+        toast({
+          title: "Erreur de chargement",
+          description: "Impossible de récupérer les paramètres de la boutique.",
+          variant: "destructive",
+        })
+        console.error("Error fetching settings:", error)
+                } else if (data) {
+                  setStoreSettings(data)
+                  // Charger les paramètres JSONB, avec des valeurs par défaut si null
+                  if (data.notification_settings) setNotifications(data.notification_settings);
+                  if (data.shipping_settings) setShipping(data.shipping_settings);
+                  if (data.payment_settings) setPayment(data.payment_settings);
+                }
+                setLoading(false)
+              }
+    fetchSettings()
+  }, [toast])
+
+  // --- GESTIONNAIRES D'ÉVÉNEMENTS ---
+
+  const handleSave = async () => {
+    // NOTE: Actuellement, seule la section "Général" est sauvegardée.
+    const { error } = await supabase
+      .from("store_settings")
+      .update({ 
+        ...storeSettings, 
+        notification_settings: notifications, // Sauvegarder les JSONB
+        shipping_settings: shipping,         // Sauvegarder les JSONB
+        payment_settings: payment,           // Sauvegarder les JSONB
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", 1)
+
+    if (error) {
+      toast({
+        title: "Échec de la sauvegarde",
+        description: "Une erreur est survenue lors de l'enregistrement.",
+        variant: "destructive",
+      })
+      console.error("Error saving settings:", error)
+    } else {
+      setSaved(true)
+      toast({
+        title: "Enregistré !",
+        description: "Les paramètres de votre boutique ont été mis à jour.",
+      })
+      setTimeout(() => setSaved(false), 2000)
+    }
   }
 
+  // Affiche un état de chargement pendant la récupération des données
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p>Chargement des paramètres...</p>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
-      {/* Page header */}
+      {/* En-tête de la page */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Paramètres</h1>
@@ -105,7 +189,7 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* Settings tabs */}
+      {/* Onglets des paramètres */}
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList className="bg-secondary p-1 rounded-full">
           <TabsTrigger value="general" className="rounded-full data-[state=active]:bg-background">
@@ -126,7 +210,7 @@ export default function SettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* General Settings */}
+        {/* Paramètres généraux */}
         <TabsContent value="general" className="space-y-6">
           <Card className="border-0 shadow-sm">
             <CardHeader>
@@ -142,7 +226,7 @@ export default function SettingsPage() {
                   <Label htmlFor="storeName">Nom de la boutique</Label>
                   <Input
                     id="storeName"
-                    value={storeSettings.name}
+                    value={storeSettings.name || ""}
                     onChange={(e) =>
                       setStoreSettings({ ...storeSettings, name: e.target.value })
                     }
@@ -153,7 +237,7 @@ export default function SettingsPage() {
                   <Input
                     id="storeEmail"
                     type="email"
-                    value={storeSettings.email}
+                    value={storeSettings.email || ""}
                     onChange={(e) =>
                       setStoreSettings({ ...storeSettings, email: e.target.value })
                     }
@@ -163,7 +247,7 @@ export default function SettingsPage() {
                   <Label htmlFor="storePhone">Numéro de téléphone</Label>
                   <Input
                     id="storePhone"
-                    value={storeSettings.phone}
+                    value={storeSettings.phone || ""}
                     onChange={(e) =>
                       setStoreSettings({ ...storeSettings, phone: e.target.value })
                     }
@@ -173,7 +257,7 @@ export default function SettingsPage() {
                   <Label htmlFor="storeAddress">Adresse</Label>
                   <Input
                     id="storeAddress"
-                    value={storeSettings.address}
+                    value={storeSettings.address || ""}
                     onChange={(e) =>
                       setStoreSettings({ ...storeSettings, address: e.target.value })
                     }
@@ -184,7 +268,7 @@ export default function SettingsPage() {
                 <Label htmlFor="storeDescription">Description de la boutique</Label>
                 <Textarea
                   id="storeDescription"
-                  value={storeSettings.description}
+                  value={storeSettings.description || ""}
                   onChange={(e) =>
                     setStoreSettings({ ...storeSettings, description: e.target.value })
                   }
@@ -207,7 +291,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Devise</Label>
                   <Select
-                    value={storeSettings.currency}
+                    value={storeSettings.currency || "EUR"}
                     onValueChange={(value) =>
                       setStoreSettings({ ...storeSettings, currency: value })
                     }
@@ -226,7 +310,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Fuseau horaire</Label>
                   <Select
-                    value={storeSettings.timezone}
+                    value={storeSettings.timezone || "Europe/Paris"}
                     onValueChange={(value) =>
                       setStoreSettings({ ...storeSettings, timezone: value })
                     }
@@ -247,6 +331,8 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* NOTE: Les sections suivantes sont encore statiques */}
+        
         {/* Payment Settings */}
         <TabsContent value="payments" className="space-y-6">
           <Card className="border-0 shadow-sm">
@@ -366,7 +452,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Livraison standard</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">$</span>
+                    <span className="text-muted-foreground">FCFA</span>
                     <Input
                       value={shipping.standardRate}
                       onChange={(e) =>
@@ -379,7 +465,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Livraison express</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">$</span>
+                    <span className="text-muted-foreground">FCFA</span>
                     <Input
                       value={shipping.expressRate}
                       onChange={(e) =>
@@ -392,7 +478,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>International</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">$</span>
+                    <span className="text-muted-foreground">FCFA</span>
                     <Input
                       value={shipping.internationalRate}
                       onChange={(e) =>
@@ -418,14 +504,31 @@ export default function SettingsPage() {
               <CardDescription>Configurez quels e-mails envoyer</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { key: "orderConfirmation", label: "Confirmation de commande", desc: "Envoyer lorsqu'une nouvelle commande est passée" },
-                { key: "orderShipped", label: "Commande expédiée", desc: "Envoyer lorsqu'une commande est expédiée" },
-                { key: "orderDelivered", label: "Commande livrée", desc: "Envoyer lorsqu'une commande est livrée" },
-                { key: "newCustomer", label: "Bienvenue nouveau client", desc: "Envoyer un e-mail de bienvenue aux nouveaux clients" },
-                { key: "lowStock", label: "Alerte stock faible", desc: "Être notifié lorsque les produits sont en rupture de stock" },
-                { key: "weeklyReport", label: "Rapport hebdomadaire", desc: "Recevoir un résumé hebdomadaire des ventes" },
-              ].map((item) => (
+              {[{
+                key: "orderConfirmation",
+                label: "Confirmation de commande",
+                desc: "Envoyer lorsqu'une nouvelle commande est passée"
+              }, {
+                key: "orderShipped",
+                label: "Commande expédiée",
+                desc: "Envoyer lorsqu'une commande est expédiée"
+              }, {
+                key: "orderDelivered",
+                label: "Commande livrée",
+                desc: "Envoyer lorsqu'une commande est livrée"
+              }, {
+                key: "newCustomer",
+                label: "Bienvenue nouveau client",
+                desc: "Envoyer un e-mail de bienvenue aux nouveaux clients"
+              }, {
+                key: "lowStock",
+                label: "Alerte stock faible",
+                desc: "Être notifié lorsque les produits sont en rupture de stock"
+              }, {
+                key: "weeklyReport",
+                label: "Rapport hebdomadaire",
+                desc: "Recevoir un résumé hebdomadaire des ventes"
+              }].map((item) => (
                 <div
                   key={item.key}
                   className="flex items-center justify-between p-4 bg-secondary rounded-xl"
@@ -442,6 +545,21 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
+              {/* Nouveau champ pour le seuil d'alerte stock faible */}
+              <div className="flex items-center justify-between p-4 bg-secondary rounded-xl">
+                <div>
+                  <p className="font-medium">Seuil d'alerte stock faible</p>
+                  <p className="text-sm text-muted-foreground">Recevoir une alerte si le stock est inférieur ou égal à ce nombre</p>
+                </div>
+                <Input
+                  type="number"
+                  value={notifications.lowStockThreshold}
+                  onChange={(e) =>
+                    setNotifications({ ...notifications, lowStockThreshold: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-24"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

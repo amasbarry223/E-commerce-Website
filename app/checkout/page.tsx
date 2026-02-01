@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card"
 import { useCart } from "@/context/cart-context"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { toast } from 'sonner' // Importation de toast de sonner
 
 type Step = "shipping" | "payment" | "confirmation"
 
@@ -46,6 +47,9 @@ export default function CheckoutPage() {
     cvv: "",
   })
 
+  const [errors, setErrors] = useState<Record<string, string | null>>({})
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false)
+
   // Sauvegarder dans localStorage
   const saveToLocalStorage = () => {
     if (typeof window !== "undefined") {
@@ -59,9 +63,18 @@ export default function CheckoutPage() {
       const saved = localStorage.getItem("checkout_form_data")
       if (saved) {
         try {
-          setFormData(JSON.parse(saved))
+          const parsed = JSON.parse(saved)
+          setFormData(parsed)
+          // Ne pas charger les infos de carte du localStorage pour des raisons de sécurité
+          setFormData(prev => ({
+            ...prev,
+            cardNumber: "",
+            cardName: "",
+            expiryDate: "",
+            cvv: ""
+          }))
         } catch (e) {
-          // Ignore
+          console.error("Failed to parse checkout form data from localStorage", e)
         }
       }
     }
@@ -73,6 +86,126 @@ export default function CheckoutPage() {
       saveToLocalStorage()
       return updated
     })
+    // Clear error for the field being edited
+    setErrors(prev => ({ ...prev, [field]: null }))
+  }
+
+  const validateField = (field: string, value: string): string | null => {
+    switch (field) {
+      case "email":
+        if (!value) return "L'email est requis."
+        if (!/\S+@\S+\.\S+/.test(value)) return "Format d'email invalide."
+        return null
+      case "firstName":
+      case "lastName":
+      case "address":
+      case "city":
+      case "zipCode":
+      case "country":
+      case "phone":
+      case "cardName":
+        if (!value) return "Ce champ est requis."
+        return null
+      case "cardNumber":
+        if (!value) return "Le numéro de carte est requis."
+        if (!/^\d{16}$/.test(value.replace(/\s/g, ''))) return "Numéro de carte invalide (16 chiffres)."
+        return null
+      case "expiryDate":
+        if (!value) return "La date d'expiration est requise."
+        if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(value)) return "Format invalide (MM/AA)."
+        // Basic month/year validation
+        const [month, year] = value.split('/').map(Number)
+        const currentYear = new Date().getFullYear() % 100
+        const currentMonth = new Date().getMonth() + 1
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+            return "Carte expirée."
+        }
+        return null
+      case "cvv":
+        if (!value) return "Le CVV est requis."
+        if (!/^\d{3,4}$/.test(value)) return "CVV invalide (3 ou 4 chiffres)."
+        return null
+      default:
+        return null
+    }
+  }
+
+  const handleBlur = (field: string) => {
+    const error = validateField(field, formData[field as keyof typeof formData])
+    setErrors(prev => ({ ...prev, [field]: error }))
+  }
+
+  const validateShippingForm = (): boolean => {
+    let newErrors: Record<string, string | null> = {}
+    const fields: Array<keyof typeof formData> = [
+      "email", "firstName", "lastName", "address", "city", "zipCode", "country", "phone"
+    ]
+    fields.forEach(field => {
+      newErrors[field as string] = validateField(field as string, formData[field])
+    })
+    setErrors(newErrors)
+    return !Object.values(newErrors).some(error => error !== null)
+  }
+
+  const validatePaymentForm = (): boolean => {
+    let newErrors: Record<string, string | null> = {}
+    const fields: Array<keyof typeof formData> = [
+      "cardNumber", "cardName", "expiryDate", "cvv"
+    ]
+    fields.forEach(field => {
+      newErrors[field as string] = validateField(field as string, formData[field])
+    })
+    setErrors(newErrors)
+    return !Object.values(newErrors).some(error => error !== null)
+  }
+
+  const handleSubmitShipping = () => {
+    if (validateShippingForm()) {
+      setCurrentStep("payment")
+    }
+  }
+
+  const handleSubmitPayment = async () => {
+    if (!validatePaymentForm()) {
+        toast.error("Veuillez corriger les erreurs de paiement.");
+        return;
+    }
+
+    setIsProcessingOrder(true);
+    try {
+        const response = await fetch('/api/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                formData,
+                cartItems: items,
+                total: total,
+                shipping: shipping,
+                tax: tax,
+            }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            toast.success("Commande passée avec succès !");
+            clearCart(); // Vider le panier
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("checkout_form_data"); // Nettoyer le localStorage
+            }
+            setCurrentStep("confirmation");
+        } else {
+            toast.error(result.message || "Échec de la commande. Veuillez réessayer.");
+            console.error("Order creation failed:", result);
+        }
+    } catch (error) {
+        toast.error("Une erreur inattendue est survenue.");
+        console.error("Unexpected error during order creation:", error);
+    } finally {
+        setIsProcessingOrder(false);
+    }
   }
 
   const shipping = totalPrice > 100 ? 0 : 10
@@ -420,6 +553,7 @@ export default function CheckoutPage() {
                             variant="outline"
                             onClick={() => setCurrentStep("shipping")}
                             className="flex-1"
+                            disabled={isProcessingOrder}
                           >
                             Retour
                           </Button>
@@ -427,9 +561,19 @@ export default function CheckoutPage() {
                             size="lg"
                             className="flex-1"
                             onClick={handleSubmitPayment}
+                            disabled={isProcessingOrder}
                           >
-                            Confirmer la commande
-                            <Lock className="ml-2 w-4 h-4" />
+                            {isProcessingOrder ? (
+                                <span className="flex items-center">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Traitement...
+                                </span>
+                            ) : (
+                                <>
+                                    Confirmer la commande
+                                    <Lock className="ml-2 w-4 h-4" />
+                                </>
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -483,7 +627,7 @@ export default function CheckoutPage() {
                           {item.product.name} x{item.quantity}
                         </span>
                         <span className="text-foreground">
-                          ${(item.product.price * item.quantity).toFixed(2)}
+                          FCFA {(item.product.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     ))}
@@ -491,22 +635,22 @@ export default function CheckoutPage() {
                   <div className="border-t pt-4 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Sous-total</span>
-                      <span className="text-foreground">${totalPrice.toFixed(2)}</span>
+                      <span className="text-foreground">FCFA {totalPrice.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Livraison</span>
                       <span className="text-foreground">
-                        {shipping === 0 ? "Gratuit" : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "Gratuit" : `FCFA ${shipping.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Taxe</span>
-                      <span className="text-foreground">${tax.toFixed(2)}</span>
+                      <span className="text-foreground">FCFA {tax.toFixed(2)}</span>
                     </div>
                     <div className="border-t pt-4">
                       <div className="flex justify-between font-bold">
                         <span>Total</span>
-                        <span>${total.toFixed(2)}</span>
+                        <span>FCFA {total.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -524,4 +668,31 @@ export default function CheckoutPage() {
     </div>
   )
 }
+
+function Loader2(props: React.SVGProps<SVGSVGElement>) {
+    return (
+      <svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2v4" />
+        <path d="M12 18v4" />
+        <path d="M4.93 4.93l2.83 2.83" />
+        <path d="M16.24 16.24l2.83 2.83" />
+        <path d="M2 12h4" />
+        <path d="M18 12h4" />
+        <path d="M4.93 19.07l2.83-2.83" />
+        <path d="M16.24 7.76l2.83-2.83" />
+      </svg>
+    );
+  }
+
 

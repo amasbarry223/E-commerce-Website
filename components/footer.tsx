@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -46,7 +47,13 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-2">
             <Link href="/" className="inline-block mb-4">
-              <span className="text-2xl font-bold">Nextgen</span>
+              <Image
+                src="/logo.png"
+                alt="Tonomi Logo"
+                width={196}
+                height={56}
+                className="h-14 w-auto"
+              />
             </Link>
             <p className="text-background/70 text-sm mb-6 max-w-xs">
               Découvrez une mode de qualité qui reflète votre style et rend chaque jour agréable.
@@ -155,7 +162,7 @@ export function Footer() {
         <div className="mt-12 pt-8 border-t border-background/10">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-sm text-background/70">
-              &copy; {new Date().getFullYear()} Nextgen. Tous droits réservés.
+              &copy; {new Date().getFullYear()} Tonomi. Tous droits réservés.
             </p>
             <div className="flex items-center gap-4">
               <span className="text-sm text-background/70">Nous acceptons :</span>

@@ -1,21 +1,20 @@
-"use client"
-
+import { supabase } from '@/lib/supabaseClient'
 import { useState, useEffect } from 'react'
-import { getCustomers, saveCustomers, initializeStorage } from '@/lib/storage'
-import type { MockCustomer } from '@/lib/mock-data'
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export interface Customer {
-  id: string
-  name: string
-  email: string
-  phone: string
-  avatar: string | null
-  status: string
-  totalOrders: number
-  totalSpent: number
-  createdAt: string
-  lastOrderAt: string
-  address: string
+  id: string // from profiles.id
+  name: string | null // from profiles.name
+  email?: string // from auth.users.email (now optional)
+  role: string // from profiles.role
+  avatar: string | null // Placeholder, not in current schema
+  status: 'active' | 'inactive' | 'banned' // Derived from role and banned_until (simplified for now)
+  total_orders?: number // Requires aggregation, placeholder for now
+  total_spent?: number // Requires aggregation, placeholder for now
+  created_at?: string // from auth.users.created_at (now optional)
+  last_order_at?: string // Requires aggregation, placeholder for now
+  phone?: string // Requires aggregation from orders or schema change, placeholder for now
+  address?: string // Requires aggregation from orders or schema change, placeholder for now
 }
 
 export function useCustomers(search?: string) {
@@ -30,80 +29,85 @@ export function useCustomers(search?: string) {
   const fetchCustomers = async () => {
     try {
       setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Fetch profiles and join with auth.users for email and created_at
+      let query = supabase
+        .from('profiles')
+        .select(`
+          id,
+          name,
+          role
+        `)
+        // NOTE: The direct selection of `auth_users (email, created_at)` was causing a 400 Bad Request
+        // due to missing explicit foreign key relationship and/or RLS policies in Supabase.
+        // To properly fetch `email` and `created_at` from `auth.users` table:
+        // 1. Ensure a foreign key constraint exists from `profiles.id` to `auth.users.id` in Supabase.
+        // 2. Configure Row Level Security (RLS) policies on the `profiles` table to allow
+        //    read access to related `auth.users` data.
+        // 3. Once configured, you can re-enable `auth_users (email, created_at)` in the select statement
+        //    and update the Customer interface and mapping accordingly.
 
-      initializeStorage()
-      let allCustomers = getCustomers()
+        // .eq('role', 'customer') // Only fetch customers, adjust as needed
 
-      // Filtrer par recherche
       if (search) {
-        const searchLower = search.toLowerCase()
-        allCustomers = allCustomers.filter(
-          c => c.name.toLowerCase().includes(searchLower) || 
-               c.email.toLowerCase().includes(searchLower)
-        )
+        query = query.or(`name.ilike.%${search}%,auth_users.email.ilike.%${search}%`)
       }
 
-      // Transformer en format Customer avec avatar
-      const transformedCustomers: Customer[] = allCustomers.map(c => ({
-        id: c.id,
-        name: c.name,
-        email: c.email,
-        phone: c.phone,
-        avatar: null, // Pas d'avatar dans mock-data pour l'instant
-        status: c.status,
-        totalOrders: c.totalOrders,
-        totalSpent: c.totalSpent,
-        createdAt: c.createdAt,
-        lastOrderAt: c.lastOrder || '',
-        address: c.address,
-      }))
+      const { data, error: fetchError } = await query
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      const transformedCustomers: Customer[] = data.map((profile: any) => {
+        // Placeholder for aggregated data, as per analysis
+        const userCreatedAt = undefined; // Temporarily undefined as auth_users is not selected
+        const userEmail = undefined; // Temporarily undefined as auth_users is not selected
+        // Simplified status derivation:
+        // If the user has a banned_until, they are banned. Otherwise, active.
+        // We are not fetching banned_until here, so we will simplify to active/inactive based on role for now.
+        const derivedStatus: Customer['status'] = profile.role === 'admin' ? 'active' : 'active'; // More complex logic needed for 'banned'
+
+        return {
+          id: profile.id,
+          name: profile.name,
+          // email: userEmail, // Temporarily commented out
+          role: profile.role,
+          avatar: null, // No avatar in current schema
+          status: derivedStatus, // Placeholder/Simplified
+          total_orders: 0, // Placeholder, requires aggregation
+          total_spent: 0, // Placeholder, requires aggregation
+          // created_at: userCreatedAt, // Temporarily commented out
+          last_order_at: '', // Placeholder, requires aggregation
+          phone: '', // Placeholder, requires aggregation or schema change
+          address: '', // Placeholder, requires aggregation or schema change
+        }
+      })
 
       setCustomers(transformedCustomers)
       setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des clients')
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des clients')
     } finally {
       setLoading(false)
     }
   }
 
+  // NOTE: toggleCustomerStatus will need significant refactoring if 'status' is derived
+  // from role and banned_until. For now, it throws an error.
   const toggleCustomerStatus = async (customerId: string, currentStatus: string) => {
-    try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allCustomers = getCustomers()
-      const index = allCustomers.findIndex(c => c.id === customerId)
-      
-      if (index === -1) {
-        throw new Error('Client non trouvé')
-      }
-
-      const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
-      const updatedCustomer: MockCustomer = {
-        ...allCustomers[index],
-        status: newStatus as any,
-      }
-
-      allCustomers[index] = updatedCustomer
-      saveCustomers(allCustomers)
-
-      setCustomers((prev) =>
-        prev.map((c) => (c.id === customerId ? { ...c, status: newStatus } : c))
-      )
-      return updatedCustomer
-    } catch (error) {
-      throw error
-    }
+    // This function needs to update the profile role or a banned_until field in auth.users
+    // For a simple toggle between active/inactive, you'd likely update the 'is_active' field in profiles table
+    // or adjust the 'role'.
+    // For 'banned', you'd set auth.users.banned_until.
+    // Given the current derived 'status', this needs a more robust implementation.
+    throw new Error('toggleCustomerStatus non implémenté pour les clients Supabase. Nécessite une logique pour mettre à jour les rôles ou la date de bannissement.')
   }
 
   return {
     customers,
     loading,
     error,
-    toggleCustomerStatus,
+    toggleCustomerStatus, // Will throw error until implemented
     refetch: fetchCustomers,
   }
 }

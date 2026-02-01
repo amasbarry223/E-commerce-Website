@@ -64,7 +64,7 @@ export function ImageGallery({ images, productName, isNew, hasSale }: ImageGalle
               className="absolute inset-0"
             >
               <Image
-                src={images[selectedImage] || "/placeholder.svg"}
+                src={images[selectedImage] && images[selectedImage] !== '' ? images[selectedImage] : "/placeholder.svg"}
                 alt={`${productName} - Image ${selectedImage + 1}`}
                 fill
                 className={cn(
@@ -126,7 +126,7 @@ export function ImageGallery({ images, productName, isNew, hasSale }: ImageGalle
               aria-label={`Voir l'image ${index + 1}`}
             >
               <Image
-                src={image || "/placeholder.svg"}
+                src={image && image !== '' ? image : "/placeholder.svg"}
                 alt={`${productName} thumbnail ${index + 1}`}
                 fill
                 className="object-cover"
@@ -165,7 +165,7 @@ export function ImageGallery({ images, productName, isNew, hasSale }: ImageGalle
 
               <div className="relative aspect-[3/4] rounded-lg overflow-hidden">
                 <Image
-                  src={images[selectedImage] || "/placeholder.svg"}
+                  src={images[selectedImage] && images[selectedImage] !== '' ? images[selectedImage] : "/placeholder.svg"}
                   alt={`${productName} - Vue agrandie`}
                   fill
                   className="object-contain"

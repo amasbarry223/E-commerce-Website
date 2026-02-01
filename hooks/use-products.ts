@@ -1,26 +1,26 @@
 "use client"
 
+import { supabase } from '@/lib/supabaseClient' // Import Supabase client
 import { useState, useEffect } from 'react'
-import { getProducts, saveProducts, generateId, initializeStorage } from '@/lib/storage'
-import type { MockProduct } from '@/lib/mock-data'
 
 export interface Product {
   id: string
   name: string
   price: number
-  originalPrice?: number
+  original_price?: number // Renommé pour correspondre à Supabase
   description: string
   images: string[]
-  category: string
-  categoryId: string
+  category_id: string // Renommé pour correspondre à Supabase
   sizes: string[]
   colors: { name: string; value: string }[]
-  isNew: boolean
-  inStock: boolean
+  is_new: boolean // Renommé pour correspondre à Supabase
+  in_stock: boolean // Renommé pour correspondre à Supabase
   rating: number
   reviews: number
   stock: number
   sku: string
+  created_at: string // Ajouté pour correspondre à Supabase
+  updated_at: string // Ajouté pour correspondre à Supabase
 }
 
 export function useProducts(category?: string, search?: string) {
@@ -35,95 +35,66 @@ export function useProducts(category?: string, search?: string) {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 200))
+      let query = supabase.from('products').select('*')
 
-      initializeStorage()
-      let allProducts = getProducts()
-
-      // Filtrer par catégorie
       if (category && category !== 'ALL') {
-        allProducts = allProducts.filter(p => p.category === category)
+        query = query.eq('category_id', category)
       }
 
-      // Filtrer par recherche
       if (search) {
-        const searchLower = search.toLowerCase()
-        allProducts = allProducts.filter(
-          p => p.name.toLowerCase().includes(searchLower) || 
-               p.sku.toLowerCase().includes(searchLower)
-        )
+        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
       }
 
-      setProducts(allProducts)
+      const { data, error } = await query
+      if (error) {
+        throw error
+      }
+      setProducts(data || [])
       setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des produits')
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des produits')
     } finally {
       setLoading(false)
     }
   }
 
-  const createProduct = async (productData: Omit<Product, 'id' | 'rating' | 'reviews'>) => {
+  const createProduct = async (productData: Omit<Product, 'id' | 'rating' | 'reviews' | 'created_at' | 'updated_at'>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const newProduct: MockProduct = {
-        id: generateId('prod'),
-        ...productData,
-        rating: 0,
-        reviews: 0,
+      const { data, error } = await supabase.from('products').insert(productData).select().single()
+      if (error) {
+        throw error
       }
-
-      const allProducts = getProducts()
-      allProducts.unshift(newProduct)
-      saveProducts(allProducts)
-      setProducts((prev) => [newProduct, ...prev])
-
-      return newProduct
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la création du produit')
+      setProducts((prev) => [data, ...prev])
+      return data
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la création du produit')
     }
   }
 
   const updateProduct = async (id: string, productData: Partial<Product>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allProducts = getProducts()
-      const index = allProducts.findIndex(p => p.id === id)
-      
-      if (index === -1) {
-        throw new Error('Produit non trouvé')
+      const { data, error } = await supabase.from('products').update(productData).eq('id', id).select().single()
+      if (error) {
+        throw error
       }
-
-      const updatedProduct = { ...allProducts[index], ...productData }
-      allProducts[index] = updatedProduct
-      saveProducts(allProducts)
-
       setProducts((prev) =>
-        prev.map((p) => (p.id === id ? updatedProduct : p))
+        prev.map((p) => (p.id === id ? data : p))
       )
-      return updatedProduct
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du produit')
+      return data
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la mise à jour du produit')
     }
   }
 
   const deleteProduct = async (id: string) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allProducts = getProducts()
-      const filtered = allProducts.filter(p => p.id !== id)
-      saveProducts(filtered)
-
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (error) {
+        throw error
+      }
       setProducts((prev) => prev.filter((p) => p.id !== id))
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la suppression du produit')
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la suppression du produit')
     }
   }
 

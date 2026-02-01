@@ -5,7 +5,7 @@ import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Heart, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 interface QuickViewModalProps {
@@ -63,8 +63,11 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
               <div className="p-6 md:p-8 flex flex-col justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{product.category}</p>
-                  <h2 className="text-2xl font-bold text-foreground mb-4">{product.name}</h2>
-                  <p className="text-3xl font-bold text-foreground mb-6">${product.price}</p>
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold text-foreground mb-2">{product.name}</DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">{product.category}</DialogDescription>
+                  </DialogHeader>
+                  <p className="text-3xl font-bold text-foreground mb-6">FCFA {product.price}</p>
                 </div>
 
                 <div className="space-y-3">

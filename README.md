@@ -1,7 +1,7 @@
 <<<<<<< HEAD
 # E-commerce Fashion Website - Frontend-Only
 
-Application e-commerce complète avec dashboard administrateur, construite avec Next.js 16 et TypeScript. **Application 100% frontend-only** utilisant localStorage pour la persistance des données.
+Application e-commerce complète avec dashboard administrateur, construite avec Next.js 16 et TypeScript. Ce projet utilise Supabase comme solution "backend-as-a-service" pour la persistance des données principales et l'authentification.
 
 ## 🚀 Fonctionnalités
 
@@ -18,7 +18,7 @@ Application e-commerce complète avec dashboard administrateur, construite avec 
 - ✅ Upload d'images (base64)
 - ✅ Authentification simplifiée (Login/Register)
 - ✅ Thème dark/light
-- ✅ Données persistantes dans localStorage
+
 - ✅ Initialisation automatique avec données mockées
 
 ## 📋 Prérequis
@@ -39,7 +39,27 @@ cd e-commerce-fashion-website
 pnpm install
 ```
 
-**Note** : Aucune configuration de base de données nécessaire ! L'application utilise localStorage pour stocker toutes les données.
+### Configuration Supabase
+
+L'application utilise Supabase pour la persistance des données et l'authentification. Vous devez configurer votre projet Supabase et fournir les variables d'environnement nécessaires.
+
+1.  **Créer un projet Supabase**: Si vous n'en avez pas, créez un nouveau projet sur [Supabase](https://supabase.com/).
+2.  **Récupérer les clés API**: Dans les paramètres de votre projet Supabase, trouvez votre `Project URL` et votre `Anon Key` (clés publiques).
+3.  **Créer un fichier `.env.local`**: À la racine de votre projet, créez un fichier nommé `.env.local` et ajoutez-y les variables suivantes :
+    ```env
+    NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+    ```
+    Remplacez `YOUR_SUPABASE_PROJECT_URL` et `YOUR_SUPABASE_ANON_KEY` par les valeurs de votre projet Supabase.
+4.  **Configuration des tables**: Pour le script `create-admin.ts`, vous aurez besoin d'une `SERVICE_ROLE_KEY`. Cette clé ne doit JAMAIS être exposée côté client.
+    ```env
+    SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+    ```
+    Vous devrez également configurer les tables `profiles`, `carts`, et `cart_items` dans votre base de données Supabase. Le schéma est implicite via l'utilisation dans `auth-context.tsx` et `cart-context.tsx`.
+
+La modification inclut également le déplacement de l'instruction `pnpm install` pour qu'elle précède la configuration de Supabase, car les dépendances doivent être installées avant toute exécution de script potentiellement lié à l'environnement.
+
+
 
 ## 🎯 Utilisation
 
@@ -83,15 +103,14 @@ pnpm lint         # Linter le code
 ├── components/           # Composants React
 ├── context/             # Contexts React (Auth, Cart)
 ├── hooks/               # Hooks personnalisés
-│   ├── use-products.ts   # Gestion produits (localStorage)
-│   ├── use-orders.ts     # Gestion commandes (localStorage)
-│   ├── use-customers.ts  # Gestion clients (localStorage)
-│   ├── use-categories.ts # Gestion catégories (localStorage)
-│   └── use-coupons.ts    # Gestion coupons (localStorage)
+│   ├── use-products.ts   # Gestion produits (via Supabase)
+│   ├── use-orders.ts     # Gestion commandes (via Supabase)
+│   ├── use-customers.ts  # Gestion clients (via Supabase)
+│   ├── use-categories.ts # Gestion catégories (via Supabase)
+│   └── use-coupons.ts    # Gestion coupons (via Supabase)
 ├── lib/
-│   ├── mock-data.ts      # Données mockées initiales
-│   ├── storage.ts        # Service localStorage
-│   └── utils.ts          # Utilitaires
+│   ├── supabaseClient.ts # Configuration du client Supabase
+│   └── utils.ts          # Fonctions utilitaires diverses
 └── public/               # Fichiers statiques
 ```
 
@@ -104,29 +123,33 @@ pnpm lint         # Linter le code
 ### Créer un nouvel utilisateur
 Les utilisateurs peuvent s'inscrire via `/account`. Par défaut, ils ont le rôle `customer`.
 
-**Note** : Tous les utilisateurs sont stockés dans localStorage. Les données sont initialisées automatiquement avec des données mockées au premier chargement.
+**Note** : Tous les utilisateurs sont gérés via Supabase Auth et les profils utilisateurs sont stockés dans la table `profiles` de Supabase. Les données peuvent être initialisées avec des scripts (comme `create-admin.ts`).
 
 ## 💾 Stockage des données
 
-L'application utilise **localStorage** pour stocker toutes les données :
+L'application utilise **Supabase** pour la persistance des données principales et l'authentification, et **localStorage** pour le stockage temporaire des données du formulaire de paiement.
 
-- `ecommerce_products` - Produits
-- `ecommerce_categories` - Catégories
-- `ecommerce_orders` - Commandes
-- `ecommerce_customers` - Clients
-- `ecommerce_coupons` - Coupons
-- `ecommerce_users` - Utilisateurs
-- `ecommerce_current_user` - Utilisateur connecté
-- `ecommerce_initialized` - Flag d'initialisation
+### Données Supabase (Principales)
+Les données suivantes sont stockées dans votre base de données Supabase :
+-   `users` (via Supabase Auth)
+-   `profiles` (rôles et informations supplémentaires des utilisateurs)
+-   `products` - Produits
+-   `categories` - Catégories
+-   `orders` - Commandes
+-   `customers` - Clients
+-   `coupons` - Coupons
+-   `carts` - Paniers (pour les utilisateurs connectés)
+-   `cart_items` - Articles des paniers
 
-### Initialisation automatique
-Au premier chargement, si localStorage est vide, l'application initialise automatiquement avec des données mockées (produits, catégories, commandes, clients, coupons, utilisateurs).
+Pour réinitialiser les données Supabase, vous devrez effacer les tables correspondantes directement via l'interface Supabase ou via des scripts SQL.
 
-### Réinitialiser les données
-Pour réinitialiser toutes les données :
-1. Ouvrir la console du navigateur (F12)
-2. Exécuter : `localStorage.clear()`
-3. Recharger la page
+### Données localStorage (Temporaires)
+`localStorage` est utilisé uniquement pour la persistance des données du formulaire de paiement (`checkout_form_data`) afin d'améliorer l'expérience utilisateur et d'éviter la perte de données temporaires en cas de navigation ou de rafraîchissement.
+
+Pour réinitialiser les données `localStorage` :
+1.  Ouvrir la console du navigateur (F12)
+2.  Exécuter : `localStorage.clear()`
+3.  Recharger la page
 
 ## 🎨 Fonctionnalités principales
 
@@ -154,39 +177,36 @@ Si vous souhaitez personnaliser l'application, vous pouvez créer un fichier `.e
 NODE_ENV="development"
 ```
 
-## 📝 Architecture Frontend-Only
+## 📝 Architecture Frontend avec BaaS (Supabase)
+
+Cette application est conçue avec une architecture "frontend-first" qui utilise Supabase comme solution de Backend-as-a-Service (BaaS) pour gérer la persistance des données et l'authentification.
 
 ### Avantages
-- ✅ Pas de dépendances backend
-- ✅ Fonctionne sans serveur de base de données
-- ✅ Déploiement simplifié (statique)
-- ✅ Données persistantes dans le navigateur
-- ✅ Pas de configuration complexe
+-   ✅ Développement rapide et simplifié pour le frontend
+-   ✅ Moins de complexité côté serveur à gérer
+-   ✅ Déploiement simplifié pour l'application frontend
+-   ✅ Données persistantes et sécurisées via Supabase Auth et Base de données
+-   ✅ Authentification robuste
 
 ### Limitations
-- ⚠️ Données limitées au navigateur (pas de synchronisation multi-appareils)
-- ⚠️ Pas de sauvegarde serveur
-- ⚠️ Authentification simplifiée (pas de JWT)
+-   ⚠️ Dépendance à un service tiers (Supabase)
+-   ⚠️ Les schémas de base de données doivent être gérés dans Supabase
+-   ⚠️ Coût potentiel lié à l'utilisation du BaaS à grande échelle
 
 ## 🐛 Dépannage
 
-### Réinitialiser les données
-```javascript
-// Dans la console du navigateur
-localStorage.clear()
-location.reload()
-```
-
-### Vérifier les données stockées
-```javascript
-// Dans la console du navigateur
-console.log(localStorage.getItem('ecommerce_products'))
-```
+### Problèmes Supabase
+-   Vérifier que les variables d'environnement Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) sont correctement configurées dans votre fichier `.env.local`.
+-   S'assurer que votre projet Supabase est configuré et que les tables nécessaires (comme `profiles`, `carts`, `cart_items`, etc.) existent et ont les permissions appropriées.
+-   Consulter les logs de votre projet Supabase pour d'éventuelles erreurs côté serveur.
 
 ### Problème d'authentification
-1. Vérifier que vous utilisez les bonnes identifiants
-2. Réinitialiser localStorage si nécessaire
-3. Vérifier la console pour les erreurs
+-   Vérifier les identifiants de connexion.
+-   S'assurer que l'utilisateur existe dans Supabase Auth.
+-   Pour les administrateurs, s'assurer que le script `create-admin.ts` a été exécuté et que le rôle 'admin' est attribué dans la table `profiles`.
+
+### Réinitialiser les données locales du navigateur
+-   Pour effacer les données temporaires du formulaire de paiement ou tout autre élément stocké localement, vous pouvez exécuter `localStorage.clear()` dans la console de votre navigateur, puis recharger la page.
 
 ## 📄 Licence
 

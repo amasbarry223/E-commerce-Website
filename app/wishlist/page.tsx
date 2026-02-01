@@ -68,10 +68,10 @@ export default function WishlistPage() {
                       </h3>
                     </Link>
                     <div className="flex items-center gap-2 mb-3">
-                      <p className="text-foreground font-semibold">${product.price}</p>
+                      <p className="text-foreground font-semibold">FCFA {product.price}</p>
                       {product.originalPrice && (
                         <p className="text-muted-foreground text-sm line-through">
-                          ${product.originalPrice}
+                          FCFA {product.originalPrice}
                         </p>
                       )}
                     </div>

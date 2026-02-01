@@ -123,11 +123,11 @@ export default function CartPage() {
                         {/* Price */}
                         <div className="text-right">
                           <p className="font-semibold text-foreground">
-                            ${(item.product.price * item.quantity).toFixed(2)}
+                            FCFA {(item.product.price * item.quantity).toFixed(2)}
                           </p>
                           {item.quantity > 1 && (
                             <p className="text-xs text-muted-foreground">
-                              ${item.product.price} l'unité
+                              FCFA {item.product.price} l'unité
                             </p>
                           )}
                         </div>
@@ -163,17 +163,17 @@ export default function CartPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Sous-total</span>
-                      <span className="text-foreground">${totalPrice.toFixed(2)}</span>
+                      <span className="text-foreground">FCFA {totalPrice.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Livraison</span>
                       <span className="text-foreground">
-                        {shipping === 0 ? "Gratuit" : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "Gratuit" : `FCFA ${shipping.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Taxe (10%)</span>
-                      <span className="text-foreground">${tax.toFixed(2)}</span>
+                      <span className="text-foreground">FCFA {tax.toFixed(2)}</span>
                     </div>
                     {shipping === 0 && (
                       <p className="text-xs text-green-600">
@@ -183,7 +183,7 @@ export default function CartPage() {
                     <div className="border-t border-border pt-3">
                       <div className="flex justify-between font-semibold">
                         <span className="text-foreground">Total</span>
-                        <span className="text-foreground">${total.toFixed(2)}</span>
+                        <span className="text-foreground">FCFA {total.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>

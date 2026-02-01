@@ -1,10 +1,8 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useSearchParams } from "next/navigation"
-import { Suspense } from "react"
 import {
   LayoutDashboard,
   Package,
@@ -17,6 +15,7 @@ import {
   ChevronDown,
   Bell,
   Search,
+  Tag,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,10 +27,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/context/auth-context" // Import useAuth
 
 const sidebarLinks = [
   { name: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { name: "Produits", href: "/admin/products", icon: Package },
+  { name: "Catégories", href: "/admin/categories", icon: Tag },
   { name: "Commandes", href: "/admin/orders", icon: ShoppingCart },
   { name: "Clients", href: "/admin/customers", icon: Users },
   { name: "Paramètres", href: "/admin/settings", icon: Settings },
@@ -43,38 +44,40 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isAuthorized, setIsAuthorized] = useState(false)
+  const { user, loading, logout } = useAuth() // Use useAuth hook
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Vérifier l'authentification admin côté client
-  // IMPORTANT: Tous les hooks doivent être appelés avant tout return conditionnel
   useEffect(() => {
-    // Ne pas vérifier l'auth sur la page de login
+    // Only check auth if not on the login page and user loading is complete
     if (pathname === '/admin/login') {
       return
     }
 
-    if (typeof window !== 'undefined') {
-      const { getCurrentUser, initializeStorage } = require('@/lib/storage')
-      initializeStorage()
-      const currentUser = getCurrentUser()
-      if (!currentUser || currentUser.role !== 'admin') {
+    if (!loading) { // Wait for auth state to load
+      if (!user || user.role !== 'admin') {
         router.push('/admin/login')
-      } else {
-        setIsAuthorized(true)
       }
     }
-  }, [router, pathname])
+  }, [user, loading, router, pathname])
 
-  // Ne pas afficher le layout admin sur la page de login
+  // Do not show the admin layout on the login page
   if (pathname === '/admin/login') {
     return <>{children}</>
   }
 
-  if (!isAuthorized) {
-    return null
+  // Show a loading state until authentication is confirmed
+  if (loading || !user || user.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Chargement de l'administration...</p> {/* Or a spinner */}
+      </div>
+    )
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/admin/login')
   }
 
   return (
@@ -99,7 +102,7 @@ export default function AdminLayout({
             {/* Logo */}
             <div className="flex items-center justify-between h-16 px-6 border-b border-background/10">
               <Link href="/admin" className="text-xl font-bold tracking-tight">
-                Nextgen Admin
+                Tonomi Admin
               </Link>
               <Button
                 variant="ghost"
@@ -138,34 +141,20 @@ export default function AdminLayout({
             <div className="p-4 border-t border-background/10">
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold">
-                  A
+                  {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'A'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-background truncate">
-                    {typeof window !== 'undefined' && (() => {
-                      const { getCurrentUser } = require('@/lib/storage')
-                      const user = getCurrentUser()
-                      return user?.name || 'Admin User'
-                    })()}
+                    {user?.name || 'Admin User'}
                   </p>
                   <p className="text-xs text-background/60 truncate">
-                    {typeof window !== 'undefined' && (() => {
-                      const { getCurrentUser } = require('@/lib/storage')
-                      const user = getCurrentUser()
-                      return user?.email || 'admin@nextgen.com'
-                    })()}
+                    {user?.email || 'admin@tonomi.com'}
                   </p>
                 </div>
               </div>
               <Button
                 variant="ghost"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    const { setCurrentUser } = require('@/lib/storage')
-                    setCurrentUser(null)
-                    window.location.href = '/admin/login'
-                  }
-                }}
+                onClick={handleLogout}
                 className="w-full justify-start gap-3 mt-2 text-background/70 hover:bg-background/10 hover:text-background"
               >
                 <LogOut className="w-5 h-5" />
@@ -218,7 +207,7 @@ export default function AdminLayout({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2">
                     <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold text-sm">
-                      A
+                      {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'A'}
                     </div>
                     <ChevronDown className="w-4 h-4" />
                   </Button>
@@ -229,15 +218,7 @@ export default function AdminLayout({
                     Paramètres
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        const { setCurrentUser } = require('@/lib/storage')
-                        setCurrentUser(null)
-                        window.location.href = '/admin/login'
-                      }
-                    }}
-                  >
+                  <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Déconnexion
                   </DropdownMenuItem>

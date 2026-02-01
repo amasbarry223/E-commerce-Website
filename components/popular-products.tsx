@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
@@ -8,88 +8,36 @@ import { Heart, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { QuickViewModal } from "@/components/quick-view-modal"
-
-const filters = ["ALL", "SHORTS", "JACKETS", "SHOES", "T-SHIRT"]
-
-const products = [
-  {
-    id: 1,
-    name: "Modern Blazer",
-    price: 125,
-    image: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=2080&auto=format&fit=crop",
-    category: "JACKETS",
-    isNew: true,
-  },
-  {
-    id: 2,
-    name: "Premium Jacket",
-    price: 189,
-    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=1935&auto=format&fit=crop",
-    category: "JACKETS",
-    isNew: false,
-  },
-  {
-    id: 3,
-    name: "Classic White Tee",
-    price: 45,
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=2080&auto=format&fit=crop",
-    category: "T-SHIRT",
-    isNew: true,
-  },
-  {
-    id: 4,
-    name: "Running Sneakers",
-    price: 165,
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=2070&auto=format&fit=crop",
-    category: "SHOES",
-    isNew: false,
-  },
-  {
-    id: 5,
-    name: "Summer Shorts",
-    price: 55,
-    image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?q=80&w=2070&auto=format&fit=crop",
-    category: "SHORTS",
-    isNew: true,
-  },
-  {
-    id: 6,
-    name: "Leather Boots",
-    price: 225,
-    image: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=1974&auto=format&fit=crop",
-    category: "SHOES",
-    isNew: false,
-  },
-  {
-    id: 7,
-    name: "Denim Jacket",
-    price: 145,
-    image: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?q=80&w=2070&auto=format&fit=crop",
-    category: "JACKETS",
-    isNew: false,
-  },
-  {
-    id: 8,
-    name: "Graphic Tee",
-    price: 39,
-    image: "https://images.unsplash.com/photo-1503341504253-dff4815485f1?q=80&w=1974&auto=format&fit=crop",
-    category: "T-SHIRT",
-    isNew: true,
-  },
-]
+import { useProducts, type Product } from "@/hooks/use-products"
+import { useCategories } from "@/hooks/use-categories"
 
 export function PopularProducts() {
-  const [activeFilter, setActiveFilter] = useState("ALL")
-  const [favorites, setFavorites] = useState<number[]>([])
-  const [quickViewProduct, setQuickViewProduct] = useState<typeof products[0] | null>(null)
-  const [hoveredProduct, setHoveredProduct] = useState<number | null>(null)
+  // Use category slug for filter, then find ID
+  const [activeFilterName, setActiveFilterName] = useState("ALL") // Use name for UI display
+  const [favorites, setFavorites] = useState<string[]>([]) // Product IDs are strings (UUIDs)
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null)
+  const [hoveredProduct, setHoveredProduct] = useState<string | null>(null) // Product IDs are strings (UUIDs)
 
-  const filteredProducts =
-    activeFilter === "ALL"
-      ? products
-      : products.filter((product) => product.category === activeFilter)
+  const { products, loading: productsLoading } = useProducts()
+  const { categories, loading: categoriesLoading } = useCategories()
 
-  const toggleFavorite = (productId: number, e?: React.MouseEvent) => {
+  const filters = useMemo(() => {
+    if (categoriesLoading || categories.length === 0) return ["ALL"]
+    return ["ALL", ...categories.map(cat => cat.name.toUpperCase())]
+  }, [categories, categoriesLoading])
+
+  const filteredProducts = useMemo(() => {
+    if (productsLoading) return []
+    if (activeFilterName === "ALL") return products
+
+    // Find the category ID for the active filter name
+    const category = categories.find(cat => cat.name.toUpperCase() === activeFilterName)
+    if (!category) return products // Fallback to all products if category not found
+
+    return products.filter(product => product.category_id === category.id)
+  }, [products, productsLoading, activeFilterName, categories])
+
+  const toggleFavorite = (productId: string, e?: React.MouseEvent) => {
     e?.preventDefault()
     e?.stopPropagation()
     setFavorites((prev) =>
@@ -99,10 +47,19 @@ export function PopularProducts() {
     )
   }
 
-  const openQuickView = (product: typeof products[0], e: React.MouseEvent) => {
+  const openQuickView = (product: Product, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setQuickViewProduct(product)
+  }
+
+  // Handle loading states
+  if (productsLoading || categoriesLoading) {
+    return (
+      <section className="container mx-auto px-4 py-12 lg:py-16 text-center">
+        <p className="text-muted-foreground">Chargement des produits...</p>
+      </section>
+    )
   }
 
   return (
@@ -117,12 +74,12 @@ export function PopularProducts() {
           {filters.map((filter) => (
             <Button
               key={filter}
-              variant={activeFilter === filter ? "default" : "outline"}
+              variant={activeFilterName === filter ? "default" : "outline"}
               size="sm"
-              onClick={() => setActiveFilter(filter)}
+              onClick={() => setActiveFilterName(filter)}
               className={cn(
                 "rounded-full text-xs",
-                activeFilter === filter
+                activeFilterName === filter
                   ? "bg-foreground text-background"
                   : "bg-transparent border-border text-foreground hover:bg-secondary"
               )}
@@ -148,14 +105,14 @@ export function PopularProducts() {
             <Link href={`/product/${product.id}`}>
               <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-secondary mb-3">
                 <Image
-                  src={product.image || "/placeholder.svg"}
+                  src={product.images?.[0] || "/placeholder.svg"} // Use first image from array
                   alt={product.name}
                   fill
                   className="object-cover object-center transition-transform duration-500"
                   loading={index < 4 ? "eager" : "lazy"}
                   sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 />
-                {product.isNew && (
+                {product.is_new && ( // Use is_new
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -213,7 +170,7 @@ export function PopularProducts() {
               <h3 className="font-medium text-foreground text-sm lg:text-base mb-1 truncate">
                 {product.name}
               </h3>
-              <p className="text-foreground font-semibold">${product.price}</p>
+              <p className="text-foreground font-semibold">FCFA {product.price}</p>
             </div>
           </motion.div>
         ))}

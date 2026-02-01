@@ -39,82 +39,82 @@ import { useCustomers, type Customer } from "@/hooks/use-customers"
 // Mock customers data (fallback)
 const mockCustomers = [
   {
-    id: 1,
-    name: "Sophie Martin",
-    email: "sophie@email.com",
-    phone: "+33 6 12 34 56 78",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
+    id: "cus_001",
+    name: "Amadou Diallo",
+    email: "amadou.d@example.com",
+    phone: "+223 76 12 34 56",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop",
     status: "active",
     totalOrders: 12,
     totalSpent: 1847,
     createdAt: "2023-06-15",
     lastOrderAt: "2024-01-15",
-    address: "123 Rue de Paris, 75001 Paris, France",
+    address: "Rue 100, Porte 20, Hamdallaye, Bamako, Mali",
   },
   {
-    id: 2,
-    name: "Lucas Dubois",
-    email: "lucas@email.com",
-    phone: "+33 6 98 76 54 32",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop",
+    id: "cus_002",
+    name: "Mariam Traoré",
+    email: "mariam.t@example.com",
+    phone: "+223 66 98 76 54",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
     status: "active",
     totalOrders: 8,
     totalSpent: 1234,
     createdAt: "2023-08-22",
     lastOrderAt: "2024-01-14",
-    address: "456 Avenue des Champs, 69001 Lyon, France",
+    address: "Quartier du Fleuve, Avenue de l'Indépendance, Ségou, Mali",
   },
   {
-    id: 3,
-    name: "Emma Bernard",
-    email: "emma@email.com",
-    phone: "+33 6 11 22 33 44",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200&auto=format&fit=crop",
+    id: "cus_003",
+    name: "Bakary Coulibaly",
+    email: "bakary.c@example.com",
+    phone: "+223 70 11 22 33",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop",
     status: "active",
     totalOrders: 5,
     totalSpent: 678,
     createdAt: "2023-10-05",
     lastOrderAt: "2024-01-10",
-    address: "789 Boulevard Saint-Germain, 75006 Paris, France",
+    address: "Hippodrome, Rue 45, Sikasso, Mali",
   },
   {
-    id: 4,
-    name: "Thomas Petit",
-    email: "thomas@email.com",
-    phone: "+33 6 55 66 77 88",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop",
+    id: "cus_004",
+    name: "Fatoumata Konaté",
+    email: "fatoumata.k@example.com",
+    phone: "+223 60 55 66 77",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200&auto=format&fit=crop",
     status: "inactive",
     totalOrders: 2,
     totalSpent: 289,
     createdAt: "2023-12-01",
     lastOrderAt: "2024-01-05",
-    address: "321 Rue Victor Hugo, 33000 Bordeaux, France",
+    address: "Niamakoro, Avenue Cheick Zayed, Kayes, Mali",
   },
   {
-    id: 5,
-    name: "Julie Roux",
-    email: "julie@email.com",
-    phone: "+33 6 99 88 77 66",
+    id: "cus_005",
+    name: "Moussa Keïta",
+    email: "moussa.k@example.com",
+    phone: "+223 75 99 88 77",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
     status: "active",
     totalOrders: 15,
     totalSpent: 2456,
     createdAt: "2023-04-10",
     lastOrderAt: "2024-01-12",
-    address: "654 Avenue Jean Jaures, 13001 Marseille, France",
+    address: "Daoudabougou, Rue 250, Mopti, Mali",
   },
   {
-    id: 6,
-    name: "Pierre Durand",
-    email: "pierre@email.com",
-    phone: "+33 6 44 33 22 11",
+    id: "cus_006",
+    name: "Aïcha Sylla",
+    email: "aicha.s@example.com",
+    phone: "+223 69 44 33 22",
     avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
     status: "banned",
     totalOrders: 1,
     totalSpent: 145,
     createdAt: "2024-01-01",
     lastOrderAt: "2024-01-02",
-    address: "987 Rue de la Republique, 59000 Lille, France",
+    address: "Sabourou, Route de Koulouba, Gao, Mali",
   },
 ]
 
@@ -141,7 +141,8 @@ export default function CustomersPage() {
   })
 
   // Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A"; // Handle undefined or null dateString
     return new Date(dateString).toLocaleDateString("fr-FR", {
       year: "numeric",
       month: "short",
@@ -153,8 +154,15 @@ export default function CustomersPage() {
   const stats = [
     { label: "Total des clients", value: customers.length },
     { label: "Actifs", value: customers.filter((c) => c.status === "active").length },
-    { label: "Revenu total", value: `$${customers.reduce((acc, c) => acc + c.totalSpent, 0).toLocaleString()}` },
-    { label: "Panier moyen", value: `$${Math.round(customers.reduce((acc, c) => acc + c.totalSpent, 0) / customers.reduce((acc, c) => acc + c.totalOrders, 0))}` },
+    { label: "Revenu total", value: `$${Number(customers.reduce((acc, c) => acc + (c.totalSpent || 0), 0)).toLocaleString()}` },
+    {
+      label: "Panier moyen",
+      value: `$${
+        customers.reduce((acc, c) => acc + (c.totalOrders || 0), 0) > 0
+          ? Math.round(customers.reduce((acc, c) => acc + (c.totalSpent || 0), 0) / customers.reduce((acc, c) => acc + (c.totalOrders || 0), 0)).toLocaleString()
+          : "N/A"
+      }`
+    },
   ]
 
   return (
@@ -285,7 +293,7 @@ export default function CustomersPage() {
                       <span className="text-sm font-medium">{customer.totalOrders}</span>
                     </td>
                     <td className="py-4 px-4 hidden sm:table-cell">
-                      <span className="text-sm font-medium">${customer.totalSpent.toLocaleString()}</span>
+                      <span className="text-sm font-medium">${Number(customer.totalSpent || 0).toLocaleString()}</span>
                     </td>
                     <td className="py-4 px-4">
                       <span
@@ -388,7 +396,7 @@ export default function CustomersPage() {
                     <p className="text-sm text-muted-foreground">Total des commandes</p>
                   </div>
                   <div className="bg-secondary rounded-xl p-4">
-                    <p className="text-2xl font-bold">${selectedCustomer.totalSpent.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">${Number(selectedCustomer.totalSpent || 0).toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground">Total dépensé</p>
                   </div>
                 </div>

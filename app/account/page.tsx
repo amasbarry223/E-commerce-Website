@@ -85,7 +85,11 @@ function LoginForm({
       toast.success("Connexion réussie !")
       router.push("/account/dashboard")
     } else {
-      toast.error(result.error || "Échec de la connexion")
+      if (result.error === "Email not confirmed") {
+        toast.error("Veuillez confirmer votre e-mail avant de vous connecter.");
+      } else {
+        toast.error(result.error || "Échec de la connexion");
+      }
     }
   }
 
@@ -106,10 +110,7 @@ function LoginForm({
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
+              placeholder="votre.nom@maliapp.com"
               className="pl-10 rounded-lg"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -250,7 +251,15 @@ function RegisterForm({
       toast.success("Compte créé avec succès !")
       router.push("/account/dashboard")
     } else {
-      toast.error(result.error || "Échec de l'inscription")
+      if (result.error?.includes("Email rate limit exceeded")) {
+        toast.error("Limite d'envoi d'e-mails dépassée. Veuillez réessayer plus tard.");
+      } else if (result.error?.includes("email service not configured")) {
+        toast.error("Le service d'e-mail n'est pas configuré. Veuillez contacter l'administrateur.");
+      } else if (result.error?.includes("Failed to send confirmation mail")) {
+        toast.error("Échec de l'envoi de l'e-mail de confirmation. Vérifiez votre configuration Supabase.");
+      } else {
+        toast.error(result.error || "Échec de l'inscription");
+      }
     }
   }
 
@@ -299,7 +308,7 @@ function RegisterForm({
               id="registerEmail"
               name="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="votre.nom@maliapp.com"
               className="pl-10 rounded-lg"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

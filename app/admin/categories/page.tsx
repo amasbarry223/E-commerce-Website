@@ -31,67 +31,8 @@ import {
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { useCategories, type Category } from "@/hooks/use-categories"
-
-// Mock categories data (fallback)
-const initialCategories = [
-  {
-    id: 1,
-    name: "JACKETS",
-    slug: "jackets",
-    description: "Vestes élégantes pour toutes les saisons",
-    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=400&auto=format&fit=crop",
-    productCount: 24,
-    isActive: true,
-  },
-  {
-    id: 2,
-    name: "T-SHIRT",
-    slug: "t-shirt",
-    description: "T-shirts confortables pour le quotidien",
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop",
-    productCount: 45,
-    isActive: true,
-  },
-  {
-    id: 3,
-    name: "SHOES",
-    slug: "shoes",
-    description: "Chaussures pour toutes les occasions",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=400&auto=format&fit=crop",
-    productCount: 32,
-    isActive: true,
-  },
-  {
-    id: 4,
-    name: "SHORTS",
-    slug: "shorts",
-    description: "Shorts décontractés pour temps chaud",
-    image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?q=80&w=400&auto=format&fit=crop",
-    productCount: 18,
-    isActive: true,
-  },
-  {
-    id: 5,
-    name: "BAGS",
-    slug: "bags",
-    description: "Sacs élégants et accessoires",
-    image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=400&auto=format&fit=crop",
-    productCount: 15,
-    isActive: true,
-  },
-  {
-    id: 6,
-    name: "ACCESSORIES",
-    slug: "accessories",
-    description: "Complétez votre look avec nos accessoires",
-    image: "https://images.unsplash.com/photo-1611923134239-b9be5816e23d?q=80&w=400&auto=format&fit=crop",
-    productCount: 28,
-    isActive: false,
-  },
-]
-
-type Category = (typeof initialCategories)[0]
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -107,7 +48,7 @@ export default function CategoriesPage() {
     name: "",
     slug: "",
     description: "",
-    isActive: true,
+    is_active: true,
   })
 
   // Filter categories
@@ -134,7 +75,7 @@ export default function CategoriesPage() {
       name: category.name,
       slug: category.slug,
       description: category.description,
-      isActive: category.isActive,
+      is_active: category.is_active, // Use is_active
     })
     setIsDialogOpen(true)
   }
@@ -152,7 +93,7 @@ export default function CategoriesPage() {
           name: formData.name,
           slug: formData.slug,
           description: formData.description || null,
-          isActive: formData.isActive,
+          is_active: formData.is_active, // Use is_active
         })
       } else {
         await createCategory({
@@ -160,13 +101,13 @@ export default function CategoriesPage() {
           slug: formData.slug,
           description: formData.description || null,
           image: null,
-          isActive: formData.isActive,
+          is_active: formData.is_active, // Use is_active
         })
       }
       setIsDialogOpen(false)
       refetch()
-    } catch (error) {
-      // Error handled in hook
+    } catch (error: any) { // Catch error and display toast
+      toast.error(error.message || "Échec de l'enregistrement de la catégorie")
     } finally {
       setSaving(false)
     }
@@ -178,8 +119,8 @@ export default function CategoriesPage() {
       await deleteCategory(id)
       setDeleteConfirm(null)
       refetch()
-    } catch (error) {
-      // Error handled in hook
+    } catch (error: any) { // Catch error and display toast
+      toast.error(error.message || "Échec de la suppression de la catégorie")
     }
   }
 
@@ -188,10 +129,10 @@ export default function CategoriesPage() {
     const category = categories.find((c) => c.id === id)
     if (category) {
       try {
-        await updateCategory(id, { isActive: !category.isActive })
+        await updateCategory(id, { is_active: !category.is_active }) // Use is_active
         refetch()
-      } catch (error) {
-        // Error handled in hook
+      } catch (error: any) { // Catch error and display toast
+        toast.error(error.message || "Échec de la mise à jour du statut de la catégorie")
       }
     }
   }
@@ -245,7 +186,7 @@ export default function CategoriesPage() {
             key={category.id}
             className={cn(
               "border-0 shadow-sm overflow-hidden group",
-              !category.isActive && "opacity-60"
+              !category.is_active && "opacity-60" // Use is_active
             )}
           >
             <div className="relative h-40">
@@ -258,9 +199,9 @@ export default function CategoriesPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
                 <h3 className="text-lg font-bold text-white">{category.name}</h3>
-                <p className="text-sm text-white/80">{category.productCount || 0} produit(s)</p>
+                <p className="text-sm text-white/80">{category.product_count || 0} produit(s)</p>
               </div>
-              {!category.isActive && (
+              {!category.is_active && ( // Use is_active
                 <div className="absolute top-4 left-4 px-2 py-1 bg-red-500 text-white text-xs rounded-full">
                   Inactif
                 </div>
@@ -274,7 +215,7 @@ export default function CategoriesPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">Actif</span>
                   <Switch
-                    checked={category.isActive}
+                    checked={category.is_active} // Use is_active
                     onCheckedChange={() => toggleCategoryStatus(category.id)}
                   />
                 </div>
@@ -384,11 +325,11 @@ export default function CategoriesPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              <Label htmlFor="isActive">Actif</Label>
+              <Label htmlFor="is_active">Actif</Label>
               <Switch
-                id="isActive"
-                checked={formData.isActive}
-                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                id="is_active" // Use is_active for ID
+                checked={formData.is_active} // Use is_active
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} // Use is_active
               />
             </div>
 

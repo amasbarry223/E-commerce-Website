@@ -1,22 +1,19 @@
-"use client"
-
+import { supabase } from '@/lib/supabaseClient'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getCoupons, saveCoupons, generateId, initializeStorage } from '@/lib/storage'
-import type { MockCoupon } from '@/lib/mock-data'
 
 export interface Coupon {
   id: string
   code: string
-  type: 'percentage' | 'fixed'
+  type: 'percentage' | 'fixed' // Correspond au type ENUM Supabase
   value: number
-  minPurchase: number
-  maxUses: number | null
-  usedCount: number
-  expiresAt: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+  min_purchase: number // Correspond au nom de la colonne Supabase
+  max_uses: number | null // Correspond au nom de la colonne Supabase
+  used_count: number // Correspond au nom de la colonne Supabase
+  expires_at: string | null // Correspond au nom de la colonne Supabase
+  is_active: boolean // Correspond au nom de la colonne Supabase
+  created_at: string
+  updated_at: string
 }
 
 export function useCoupons() {
@@ -31,92 +28,65 @@ export function useCoupons() {
   const fetchCoupons = async () => {
     try {
       setLoading(true)
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 200))
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-      initializeStorage()
-      const allCoupons = getCoupons()
-      setCoupons(allCoupons)
+      if (error) {
+        throw error
+      }
+      setCoupons(data || [])
       setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des coupons')
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des coupons')
     } finally {
       setLoading(false)
     }
   }
 
-  const createCoupon = async (couponData: Omit<Coupon, 'id' | 'usedCount' | 'createdAt' | 'updatedAt'>) => {
+  const createCoupon = async (couponData: Omit<Coupon, 'id' | 'used_count' | 'created_at' | 'updated_at'>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const newCoupon: MockCoupon = {
-        id: generateId('coupon'),
-        ...couponData,
-        usedCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const { data, error } = await supabase.from('coupons').insert(couponData).select().single()
+      if (error) {
+        throw error
       }
-
-      const allCoupons = getCoupons()
-      allCoupons.unshift(newCoupon)
-      saveCoupons(allCoupons)
-      setCoupons((prev) => [newCoupon, ...prev])
-      
+      setCoupons((prev) => [data, ...prev])
       toast.success('Coupon créé avec succès')
-      return newCoupon
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la création du coupon')
+      return data
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la création du coupon')
     }
   }
 
   const updateCoupon = async (id: string, couponData: Partial<Coupon>) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allCoupons = getCoupons()
-      const index = allCoupons.findIndex(c => c.id === id)
-      
-      if (index === -1) {
-        throw new Error('Coupon non trouvé')
+      const { data, error } = await supabase.from('coupons').update(couponData).eq('id', id).select().single()
+      if (error) {
+        throw error
       }
-
-      const updatedCoupon: MockCoupon = {
-        ...allCoupons[index],
-        ...couponData,
-        updatedAt: new Date().toISOString(),
-      }
-
-      allCoupons[index] = updatedCoupon
-      saveCoupons(allCoupons)
-
       setCoupons((prev) =>
-        prev.map((c) => (c.id === id ? updatedCoupon : c))
+        prev.map((c) => (c.id === id ? data : c))
       )
       toast.success('Coupon mis à jour avec succès')
-      return updatedCoupon
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du coupon')
+      return data
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la mise à jour du coupon')
     }
   }
 
   const deleteCoupon = async (id: string) => {
     try {
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      const allCoupons = getCoupons()
-      const filtered = allCoupons.filter(c => c.id !== id)
-      saveCoupons(filtered)
-
+      const { error } = await supabase.from('coupons').delete().eq('id', id)
+      if (error) {
+        throw error
+      }
       setCoupons((prev) => prev.filter((c) => c.id !== id))
       toast.success('Coupon supprimé avec succès')
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la suppression du coupon')
+    } catch (err: any) {
+      throw new Error(err.message || 'Erreur lors de la suppression du coupon')
     }
   }
-
   return {
     coupons,
     loading,

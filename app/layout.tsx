@@ -2,7 +2,7 @@ import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { Toaster } from '@/components/ui/sonner'
+import { ToastProvider } from '@/components/ToastProvider'
 import { CartProvider } from '@/context/cart-context'
 import { AuthProvider } from '@/context/auth-context'
 import { PageTransition } from '@/components/page-transition'
@@ -11,7 +11,7 @@ import './globals.css'
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: 'Nextgen | Modern Fashion E-commerce',
+  title: 'Tonomi | Modern Fashion E-commerce',
   description: 'Discover quality fashion that reflects your style and makes everyday enjoyable. Shop the latest trends in men, women and children clothing.',
   generator: 'v0.app',
   icons: {
@@ -46,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <AuthProvider>
           <CartProvider>
             <PageTransition>
@@ -54,7 +54,7 @@ export default function RootLayout({
             </PageTransition>
           </CartProvider>
         </AuthProvider>
-        <Toaster />
+        <ToastProvider />
         <Analytics />
       </body>
     </html>

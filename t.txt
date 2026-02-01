@@ -1,0 +1,126 @@
+Voici un guide étape par étape pour créer un compte Supabase, configurer votre base de données et l'intégrer dans votre projet Next.js.
+
+### Étape 1 : Création du projet Supabase
+
+1.  **Créer un compte Supabase :**
+    *   Allez sur [supabase.com](https://supabase.com) et inscrivez-vous.
+
+2.  **Créer un nouveau projet :**
+    *   Une fois connecté, allez sur votre tableau de bord ("Dashboard").
+    *   Cliquez sur "**New Project**".
+    *   Choisissez une organisation, donnez un nom à votre projet (ex: "E-commerce-NextGen").
+    *   Générez un mot de passe de base de données sécurisé et **sauvegardez-le précieusement**.
+    *   Choisissez la région du serveur la plus proche de vos utilisateurs.
+    *   Cliquez sur "**Create new project**".
+
+3.  **Attendre la configuration :**
+    *   Supabase va prendre quelques minutes pour configurer toute l'infrastructure.
+
+### Étape 2 : Configuration de la base de données
+
+1.  **Aller à l'éditeur SQL :**
+    *   Dans le menu de gauche de votre projet Supabase, cliquez sur l'icône de base de données, puis sur "**SQL Editor**".
+
+2.  **Exécuter le script SQL :**
+    *   Ouvrez le fichier `a.txt` que j'ai créé précédemment dans votre projet.
+    *   Copiez **tout le contenu** du fichier `a.txt`.
+    *   Collez ce contenu dans la fenêtre de l'éditeur SQL sur Supabase.
+    *   Cliquez sur le bouton "**RUN**" (ou pressez `Cmd/Ctrl + Enter`).
+    *   Cela va créer toutes vos tables (`products`, `categories`, `orders`, etc.), les types de données et les politiques de sécurité de base.
+
+3.  **Vérifier les tables :**
+    *   Après l'exécution, allez dans le "**Table Editor**" (icône de table dans le menu de gauche) pour voir toutes les tables que vous venez de créer.
+
+### Étape 3 : Intégration dans le projet Next.js
+
+1.  **Récupérer les clés d'API Supabase :**
+    *   Dans le menu de gauche, allez dans "**Project Settings**" (icône d'engrenage), puis dans la section "**API**".
+    *   Vous aurez besoin de deux informations :
+        *   **Project URL**
+        *   **Project API Keys** -> La clé `anon` (publique).
+
+2.  **Installer le client Supabase :**
+    *   Ouvrez un terminal à la racine de votre projet et exécutez la commande suivante :
+      ```bash
+      pnpm install @supabase/supabase-js
+      ```
+
+3.  **Configurer les variables d'environnement :**
+    *   À la racine de votre projet, créez un fichier nommé `.env.local` (s'il n'existe pas déjà).
+    *   Ajoutez-y vos clés Supabase. Le préfixe `NEXT_PUBLIC_` est **obligatoire** pour que Next.js puisse y accéder côté client.
+      ```
+      NEXT_PUBLIC_SUPABASE_URL=VOTRE_URL_DE_PROJET_SUPABASE
+      NEXT_PUBLIC_SUPABASE_ANON_KEY=VOTRE_CLE_ANON_SUPABASE
+      ```
+    *   **Important :** Le fichier `.env.local` est déjà listé dans votre `.gitignore`, donc vos clés ne seront pas envoyées sur Git.
+
+4.  **Créer le client Supabase :**
+    *   Dans le dossier `lib`, créez un nouveau fichier nommé `supabaseClient.ts`.
+    *   Ajoutez le code suivant pour initialiser Supabase :
+      ```typescript
+      import { createClient } from '@supabase/supabase-js'
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+      export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+      ```
+
+### Étape 4 : Remplacer la logique `localStorage` par Supabase
+
+C'est l'étape la plus importante. Vous devez progressivement remplacer tout le code qui utilise `localStorage` (`lib/storage.ts`) par des appels à votre client Supabase.
+
+1.  **Refactoriser l'authentification (`context/auth-context.tsx`) :**
+    *   **Inscription :** Remplacez la logique `register` pour utiliser `supabase.auth.signUp()`.
+      ```typescript
+      // Exemple de nouvelle fonction d'inscription
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          // Vous pouvez ajouter des données supplémentaires ici
+          data: { name: 'Votre Nom' } 
+        }
+      });
+      ```
+    *   **Connexion :** Remplacez la logique `login` pour utiliser `supabase.auth.signInWithPassword()`.
+      ```typescript
+      // Exemple de nouvelle fonction de connexion
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+      ```
+    *   **Déconnexion :** Utilisez `supabase.auth.signOut()`.
+    *   **Gestion de la session :** Utilisez `supabase.auth.onAuthStateChange()` pour écouter les changements d'état de connexion et mettre à jour l'état de votre application en temps réel.
+
+2.  **Refactoriser la récupération des données (ex: `hooks/use-products.ts`) :**
+    *   Au lieu d'appeler `getProducts()` depuis `lib/storage.ts`, vous allez maintenant appeler Supabase.
+    *   **Exemple pour récupérer tous les produits :**
+      ```typescript
+      import { supabase } from '@/lib/supabaseClient';
+
+      async function fetchProducts() {
+        const { data: products, error } = await supabase
+          .from('products')
+          .select('*');
+
+        if (error) {
+          console.error('Error fetching products:', error);
+          return [];
+        }
+        return products;
+      }
+      ```
+    *   Appliquez cette logique pour toutes les entités : catégories, commandes, etc.
+
+3.  **Supprimer `lib/storage.ts` et `lib/mock-data.ts` :**
+    *   Une fois que toutes les parties de votre application utilisent Supabase, vous pourrez supprimer ces fichiers car ils ne seront plus nécessaires.
+
+En suivant ces étapes, votre application passera d'une simulation frontend à une application web dynamique et complète, connectée à une base de données temps réel.
+
+=================================================
+
+Project URL: https://gpkofgikanxyywqagwsv.supabase.co
+
+Project API Keys anon public: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdwa29mZ2lrYW54eXl3cWFnd3N2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3Nzc4MjIsImV4cCI6MjA4NTM1MzgyMn0.5DmS-3U_oORI__qiZgy33bAVChPrpeEPhdKTdw1mdLI

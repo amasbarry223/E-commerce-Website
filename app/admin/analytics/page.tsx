@@ -261,8 +261,9 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+                     )}
+                   )}
+                   </CardContent>      </Card>
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -291,8 +292,9 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+                       )}
+                     )}
+                     </CardContent>        </Card>
 
         {/* Top Products */}
         <Card className="border-0 shadow-sm">
@@ -315,8 +317,9 @@ export default function AnalyticsPage() {
                 </div>
               ))
             )}
-          </CardContent>
-        </Card>
+                       )}
+                     )}
+                     </CardContent>        </Card>
       </div>
 
     </div>

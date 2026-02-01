@@ -1,0 +1,260 @@
+-- Schéma de base de données pour Supabase
+-- Ce script SQL est conçu pour être exécuté dans l'éditeur SQL de votre projet Supabase.
+
+-- ---------------------------------------------------------
+-- TABLE : profiles
+-- Stocke les données publiques des utilisateurs.
+-- Cette table est liée à la table `auth.users` de Supabase via l'ID utilisateur.
+-- ---------------------------------------------------------
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT,
+  role TEXT NOT NULL DEFAULT 'customer'
+);
+
+-- Active RLS (Row Level Security)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Les utilisateurs peuvent voir leur propre profil.
+CREATE POLICY "Users can view their own profile."
+ON public.profiles FOR SELECT
+USING (auth.uid() = id);
+
+-- Les utilisateurs peuvent mettre à jour leur propre profil.
+CREATE POLICY "Users can update their own profile."
+ON public.profiles FOR UPDATE
+USING (auth.uid() = id);
+
+-- ---------------------------------------------------------
+-- TABLE : categories
+-- Stocke les catégories de produits.
+-- ---------------------------------------------------------
+CREATE TABLE public.categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  description TEXT,
+  image TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Active RLS
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+-- Tout le monde peut voir les catégories.
+CREATE POLICY "Public can view categories."
+ON public.categories FOR SELECT
+USING (true);
+
+-- Seuls les administrateurs peuvent insérer/mettre à jour/supprimer.
+-- Note : Ceci nécessite une fonction `is_admin()` que vous devez créer.
+-- CREATE POLICY "Admins can manage categories."
+-- ON public.categories FOR ALL
+-- USING (is_admin(auth.uid()));
+
+
+-- ---------------------------------------------------------
+-- TABLE : products
+-- Stocke les informations sur les produits.
+-- ---------------------------------------------------------
+CREATE TABLE public.products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  price NUMERIC(10, 2) NOT NULL,
+  original_price NUMERIC(10, 2),
+  description TEXT,
+  images TEXT[], -- Tableau d'URLs
+  category_id UUID REFERENCES public.categories(id),
+  sizes TEXT[],
+  colors JSONB[], -- Tableau d'objets { "name": "Black", "value": "#000000" }
+  is_new BOOLEAN DEFAULT false,
+  in_stock BOOLEAN DEFAULT true,
+  stock INTEGER NOT NULL DEFAULT 0,
+  sku TEXT UNIQUE,
+  rating NUMERIC(2, 1) DEFAULT 0,
+  reviews INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Active RLS
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+-- Tout le monde peut voir les produits.
+CREATE POLICY "Public can view products."
+ON public.products FOR SELECT
+USING (true);
+
+-- Seuls les administrateurs peuvent gérer les produits.
+-- CREATE POLICY "Admins can manage products."
+-- ON public.products FOR ALL
+-- USING (is_admin(auth.uid()));
+
+
+-- ---------------------------------------------------------
+-- TABLE : orders
+-- Stocke les commandes des clients.
+-- ---------------------------------------------------------
+CREATE TYPE order_status AS ENUM ('pending', 'processing', 'shipped', 'completed', 'cancelled');
+CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'refunded');
+
+CREATE TABLE public.orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  customer_details JSONB, -- { name, email, phone, address }
+  total NUMERIC(10, 2) NOT NULL,
+  status order_status NOT NULL DEFAULT 'pending',
+  payment_status payment_status NOT NULL DEFAULT 'pending',
+  payment_method TEXT,
+  tracking_number TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Active RLS
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+-- Les utilisateurs peuvent voir leurs propres commandes.
+CREATE POLICY "Users can view their own orders."
+ON public.orders FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Les administrateurs peuvent voir toutes les commandes.
+-- CREATE POLICY "Admins can view all orders."
+-- ON public.orders FOR SELECT
+-- USING (is_admin(auth.uid()));
+
+-- ---------------------------------------------------------
+-- TABLE : order_items
+-- Table de liaison pour les produits dans une commande.
+-- ---------------------------------------------------------
+CREATE TABLE public.order_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES public.products(id),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  price NUMERIC(10, 2) NOT NULL, -- Prix au moment de l'achat
+  size TEXT,
+  color TEXT,
+  image TEXT -- URL de l'image au moment de l'achat
+);
+
+-- Active RLS
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+
+-- Les utilisateurs peuvent voir les articles de leurs propres commandes.
+-- Requiert une jointure pour vérifier la propriété.
+CREATE POLICY "Users can view items in their own orders."
+ON public.order_items FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.orders
+    WHERE orders.id = order_items.order_id AND orders.user_id = auth.uid()
+  )
+);
+
+-- ---------------------------------------------------------
+-- TABLE : coupons
+-- Stocke les codes de réduction.
+-- ---------------------------------------------------------
+CREATE TYPE coupon_type AS ENUM ('percentage', 'fixed');
+
+CREATE TABLE public.coupons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,
+  type coupon_type NOT NULL,
+  value NUMERIC(10, 2) NOT NULL,
+  min_purchase NUMERIC(10, 2) DEFAULT 0,
+  max_uses INTEGER,
+  used_count INTEGER DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Active RLS
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+
+-- Tout le monde peut voir les coupons actifs.
+CREATE POLICY "Public can view active coupons."
+ON public.coupons FOR SELECT
+USING (is_active = true AND (expires_at IS NULL OR expires_at > now()));
+
+-- ---------------------------------------------------------
+-- TABLE : wishlist_items
+-- Stocke la liste de souhaits d'un utilisateur.
+-- ---------------------------------------------------------
+CREATE TABLE public.wishlist_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, product_id)
+);
+
+-- Active RLS
+ALTER TABLE public.wishlist_items ENABLE ROW LEVEL SECURITY;
+
+-- Les utilisateurs peuvent gérer leur propre liste de souhaits.
+CREATE POLICY "Users can manage their own wishlist."
+ON public.wishlist_items FOR ALL
+USING (auth.uid() = user_id);
+
+
+-- *** ATTENTION : Exécutez ce script EN ENTIER dans l'éditeur SQL de Supabase. ***
+-- *** Si la table 'store_settings' existe déjà, elle sera recréée (donc les anciennes données seront perdues). ***
+-- *** C'est une bonne pratique pour être sûr d'avoir la bonne structure. ***
+
+-- Supprime la table si elle existe (pour s'assurer d'une recréation propre)
+DROP TABLE IF EXISTS public.store_settings;
+
+-- Crée la table pour les paramètres de la boutique avec toutes les colonnes JSONB
+CREATE TABLE public.store_settings (
+  id INT PRIMARY KEY DEFAULT 1, -- Assure qu'il n'y a qu'une seule ligne
+  name TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  description TEXT,
+  currency TEXT DEFAULT 'EUR',
+  timezone TEXT DEFAULT 'Europe/Paris',
+  notification_settings JSONB, -- Paramètres JSON pour les notifications
+  shipping_settings JSONB,    -- Paramètres JSON pour l'expédition
+  payment_settings JSONB,     -- Paramètres JSON pour le paiement
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT single_row_check CHECK (id = 1) -- Contrainte pour n'avoir qu'une seule ligne
+);
+
+-- Active la sécurité au niveau des lignes (RLS)
+ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
+
+-- Les administrateurs peuvent tout faire sur cette table (nécessite la fonction is_admin)
+CREATE POLICY "Admins can manage store settings"
+ON public.store_settings FOR ALL
+USING (public.is_admin(auth.uid()));
+
+-- Les utilisateurs authentifiés peuvent lire les paramètres (pour la vitrine si besoin)
+CREATE POLICY "Authenticated users can read store settings"
+ON public.store_settings FOR SELECT
+USING (auth.role() = 'authenticated');
+
+-- Insère la ligne de paramètres par défaut si elle n'existe pas déjà
+-- Cela inclut des valeurs initiales pour les champs JSONB
+INSERT INTO public.store_settings (id, name, email, phone, address, description, currency, timezone, notification_settings, shipping_settings, payment_settings)
+VALUES (
+  1,
+  'Tonomi',
+  'contact@tonomi.com',
+  '+33 1 23 45 67 89',
+  '123 Fashion Street, Paris, France',
+  'Mode de qualité qui reflète votre style.',
+  'EUR',
+  'Europe/Paris',
+  '{"orderConfirmation": true, "orderShipped": true, "orderDelivered": true, "newCustomer": true, "lowStock": true, "weeklyReport": false, "lowStockThreshold": 10}'::jsonb,
+  '{"freeShippingThreshold": "50", "standardRate": "5.99", "expressRate": "12.99", "internationalRate": "19.99"}'::jsonb,
+  '{"stripEnabled": true, "paypalEnabled": true, "bankTransferEnabled": false, "testMode": false}'::jsonb
+)
+ON CONFLICT (id) DO NOTHING; -- Évite les erreurs si la ligne existe déjà et n'est pas supprimée

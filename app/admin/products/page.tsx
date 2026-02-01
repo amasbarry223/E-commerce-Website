@@ -44,16 +44,21 @@ import { cn } from "@/lib/utils"
 import { useProducts, type Product } from "@/hooks/use-products"
 import { toast } from "sonner"
 
-interface Category {
-  id: string
-  name: string
-  slug: string
+import { useCategories, type Category } from "@/hooks/use-categories" // Import useCategories and its Category type
+
+
+
+// Helper function to generate a unique SKU
+function generateUniqueSku(): string {
+  // Simple UUID generation for unique SKU. In a real app, this might involve more logic.
+  return `SKU-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 }
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("ALL")
-  const [categories, setCategories] = useState<Category[]>([])
+  // Fetch categories directly from the hook
+  const { categories, loading: categoriesLoading } = useCategories() // Renamed to avoid conflict with products loading
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -82,16 +87,13 @@ export default function ProductsPage() {
     inStock: true,
   })
 
-  // Fetch categories
+  // Set default category for new product form when categories are loaded
   useEffect(() => {
-    const loadCategories = async () => {
-      const { getCategories, initializeStorage } = await import('@/lib/storage')
-      initializeStorage()
-      const cats = getCategories()
-      setCategories(cats.map(c => ({ id: c.id, name: c.name, slug: c.slug })))
+    if (!categoriesLoading && categories.length > 0 && !formData.categoryId && !editingProduct) {
+      setFormData(prev => ({ ...prev, categoryId: categories[0]?.id || "" }));
     }
-    loadCategories()
-  }, [])
+  }, [categories, categoriesLoading, formData.categoryId, editingProduct]);
+
 
   // Filter products (already filtered by API, but we can add client-side if needed)
   const filteredProducts = products.filter((product) => {
@@ -199,13 +201,12 @@ export default function ProductsPage() {
   // Open dialog for editing
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product)
-    const category = categories.find((c) => c.name === product.category)
     setFormData({
       name: product.name,
       price: product.price.toString(),
-      originalPrice: product.originalPrice?.toString() || "",
+      originalPrice: product.original_price?.toString() || "", // Use original_price
       description: product.description,
-      categoryId: product.categoryId || category?.id || "",
+      categoryId: product.category_id || "", // Use category_id directly
       images: Array.isArray(product.images) 
         ? product.images 
         : (typeof product.images === 'string' ? JSON.parse(product.images || '[]') : []),
@@ -213,8 +214,8 @@ export default function ProductsPage() {
       colors: product.colors,
       stock: product.stock?.toString() || "0",
       sku: product.sku || "",
-      isNew: product.isNew,
-      inStock: product.inStock,
+      isNew: product.is_new, // Use is_new
+      inStock: product.in_stock, // Use in_stock
     })
     setIsDialogOpen(true)
   }
@@ -228,22 +229,30 @@ export default function ProductsPage() {
 
     setSaving(true)
     try {
-      const productData = {
+      const productData: any = { // Utilisez 'any' temporairement pour la flexibilité
         name: formData.name,
         price: parseFloat(formData.price),
-        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
+        original_price: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
         description: formData.description,
-        categoryId: formData.categoryId,
+        category_id: formData.categoryId,
         images: formData.images.length > 0 ? formData.images : [
           "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=2080&auto=format&fit=crop",
         ],
         sizes: formData.sizes,
         colors: formData.colors,
         stock: parseInt(formData.stock) || 0,
-        sku: formData.sku,
-        isNew: formData.isNew,
-        inStock: formData.inStock,
+        is_new: formData.isNew,
+        in_stock: formData.inStock,
       }
+      // Ajouter le SKU
+      if (formData.sku) {
+        productData.sku = formData.sku
+      } else {
+        productData.sku = generateUniqueSku(); // Générer un SKU si le champ est vide
+      }
+
+      // Log the product data before sending
+      console.error("Données du produit envoyées à Supabase:", productData);
 
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData)
@@ -255,7 +264,12 @@ export default function ProductsPage() {
       setIsDialogOpen(false)
       refetch()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Échec de l'enregistrement du produit")
+      toast.error(error instanceof Error 
+        ? (error.message.includes('409') 
+            ? "Erreur : un produit avec ce SKU existe déjà. Veuillez utiliser un SKU unique." 
+            : `Erreur: ${error.message}`) // Affiche le message d'erreur brut
+        : `Échec de l'enregistrement du produit: ${(error as any)?.message || 'une erreur inconnue est survenue'}`
+      )
     } finally {
       setSaving(false)
     }
@@ -268,7 +282,7 @@ export default function ProductsPage() {
       toast.success("Produit supprimé avec succès")
       setDeleteConfirm(null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Échec de la suppression du produit")
+      toast.error(error instanceof Error ? error.message : "Échec de la suppression du produit: " + (error as any)?.message)
     }
   }
 
@@ -367,8 +381,10 @@ export default function ProductsPage() {
                           </div>
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{product.name}</p>
-                            <p className="text-xs text-muted-foreground md:hidden">{product.category}</p>
-                            {product.isNew && (
+                            <p className="text-xs text-muted-foreground md:hidden">
+                              {categories.find(c => c.id === product.category_id)?.name || 'N/A'}
+                            </p>
+                            {product.is_new && ( // Use product.is_new
                               <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent text-accent-foreground">
                                 NOUVEAU
                               </span>
@@ -377,14 +393,16 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td className="py-4 px-4 hidden md:table-cell">
-                        <span className="text-sm text-muted-foreground">{product.category}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {categories.find(c => c.id === product.category_id)?.name || 'N/A'}
+                        </span>
                       </td>
                       <td className="py-4 px-4">
                         <div>
-                          <p className="font-medium text-sm">${product.price}</p>
-                          {product.originalPrice && (
+                          <p className="font-medium text-sm">FCFA {product.price}</p>
+                          {product.original_price && ( // Use product.original_price
                             <p className="text-xs text-muted-foreground line-through">
-                              ${product.originalPrice}
+                              FCFA {product.original_price}
                             </p>
                           )}
                         </div>
@@ -393,12 +411,12 @@ export default function ProductsPage() {
                         <span
                           className={cn(
                             "inline-flex px-2 py-1 rounded-full text-xs font-medium",
-                            product.inStock
+                            product.in_stock // Use product.in_stock
                               ? "bg-green-100 text-green-700"
                               : "bg-red-100 text-red-700"
                           )}
                         >
-                          {product.inStock ? "En stock" : "Rupture de stock"}
+                          {product.in_stock ? "En stock" : "Rupture de stock"}
                         </span>
                       </td>
                       <td className="py-4 px-4 hidden lg:table-cell">
@@ -499,7 +517,7 @@ export default function ProductsPage() {
             {/* Price row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Prix ($)</Label>
+                <Label htmlFor="price">Prix (FCFA)</Label>
                 <Input
                   id="price"
                   type="number"
@@ -509,7 +527,7 @@ export default function ProductsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="originalPrice">Prix original ($)</Label>
+                <Label htmlFor="originalPrice">Prix original (FCFA)</Label>
                 <Input
                   id="originalPrice"
                   type="number"
@@ -540,16 +558,27 @@ export default function ProductsPage() {
               </Select>
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Entrez la description du produit"
-                rows={4}
-              />
+            {/* Stock and SKU row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="stock">Stock</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  placeholder="Référence unique (ex: PNT-001)"
+                />
+              </div>
             </div>
 
             {/* Image upload */}
