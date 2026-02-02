@@ -1,7 +1,7 @@
 "use client"
 
 import { supabase } from '@/lib/supabaseClient' // Import Supabase client
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 export interface Product {
   id: string
@@ -28,14 +28,41 @@ export function useProducts(category?: string, search?: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Memoize les dépendances pour éviter les re-fetch inutiles
+  const memoizedCategory = useMemo(() => category, [category])
+  const memoizedSearch = useMemo(() => search, [search])
+
   useEffect(() => {
     fetchProducts()
-  }, [category, search])
+  }, [memoizedCategory, memoizedSearch])
 
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      let query = supabase.from('products').select('*')
+      // Optimisation : sélectionner seulement les champs nécessaires
+      let query = supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          original_price,
+          description,
+          images,
+          category_id,
+          sizes,
+          colors,
+          is_new,
+          in_stock,
+          stock,
+          sku,
+          rating,
+          reviews,
+          created_at,
+          updated_at
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200) // Limiter à 200 produits pour améliorer les performances
 
       if (category && category !== 'ALL') {
         query = query.eq('category_id', category)

@@ -1,23 +1,41 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
   try {
-    const { formData, cartItems, total, shipping, tax } = await request.json();
+    const { formData, cartItems, total, shipping, tax, userId } = await request.json();
 
     if (!formData || !cartItems || cartItems.length === 0 || !total) {
       return NextResponse.json({ message: 'Données de commande invalides.' }, { status: 400 });
     }
 
-    // Récupérer l'ID de l'utilisateur authentifié (si disponible)
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
+    // Vérifier que l'utilisateur est authentifié
+    if (!userId) {
+      return NextResponse.json({ message: 'Vous devez être connecté pour passer une commande.' }, { status: 401 });
+    }
+
+    // Récupérer le token d'authentification depuis les headers
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    // Créer un client Supabase avec le token d'authentification
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    
+    // Si un token est fourni, créer un client avec ce token, sinon utiliser le client anonyme
+    const supabase = token 
+      ? createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey);
 
     // 1. Créer la commande principale
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
-        user_id: userId,
+        user_id: userId, // Utiliser l'ID utilisateur passé depuis le client
         customer_details: {
           name: `${formData.firstName} ${formData.lastName}`,
           email: formData.email,

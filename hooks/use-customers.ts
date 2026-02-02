@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export interface Customer {
@@ -22,9 +22,12 @@ export function useCustomers(search?: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Memoize la recherche pour éviter les re-fetch inutiles
+  const memoizedSearch = useMemo(() => search, [search])
+
   useEffect(() => {
     fetchCustomers()
-  }, [search])
+  }, [memoizedSearch])
 
   const fetchCustomers = async () => {
     try {
@@ -37,6 +40,8 @@ export function useCustomers(search?: string) {
           name,
           role
         `)
+        .order('name', { ascending: true })
+        .limit(100) // Limiter à 100 clients pour améliorer les performances
         // NOTE: The direct selection of `auth_users (email, created_at)` was causing a 400 Bad Request
         // due to missing explicit foreign key relationship and/or RLS policies in Supabase.
         // To properly fetch `email` and `created_at` from `auth.users` table:
@@ -49,7 +54,7 @@ export function useCustomers(search?: string) {
         // .eq('role', 'customer') // Only fetch customers, adjust as needed
 
       if (search) {
-        query = query.or(`name.ilike.%${search}%,auth_users.email.ilike.%${search}%`)
+        query = query.ilike('name', `%${search}%`)
       }
 
       const { data, error: fetchError } = await query

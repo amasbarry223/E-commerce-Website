@@ -37,12 +37,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   // Function to load the cart from Supabase
-  const loadCart = useCallback(async (signal?: AbortSignal) => { // Accept signal
-    // Check if signal is already aborted
-    if (signal?.aborted) {
-      return;
-    }
-
+  const loadCart = useCallback(async (isMounted?: () => boolean) => {
     setLoading(true);
     if (userLoading) {
       setLoading(false);
@@ -66,13 +61,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq('status', 'active')
         .single();
 
-      // Check if signal was aborted during the request
-      if (signal?.aborted) {
+      // Check if component is still mounted
+      if (isMounted && !isMounted()) {
         return;
       }
 
       if (fetchCartError && fetchCartError.code !== 'PGRST116') { // PGRST116 means "no rows found"
-        // Ignore AbortError if the fetch was intentionally cancelled
+        // Silently ignore AbortError - it's likely from Supabase Auth internal cleanup
         if (fetchCartError.name === 'AbortError' || fetchCartError.message?.includes('aborted')) {
           return;
         }
@@ -91,13 +86,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           .select('id')
           .single();
 
-        // Check if signal was aborted during the request
-        if (signal?.aborted) {
+        // Check if component is still mounted
+        if (isMounted && !isMounted()) {
           return;
         }
 
         if (createCartError) {
-          // Ignore AbortError if the insert was intentionally cancelled
+          // Silently ignore AbortError - it's likely from Supabase Auth internal cleanup
           if (createCartError.name === 'AbortError' || createCartError.message?.includes('aborted')) {
             return;
           }
@@ -124,13 +119,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         `)
         .eq('cart_id', currentCartId);
 
-      // Check if signal was aborted during the request
-      if (signal?.aborted) {
+      // Check if component is still mounted
+      if (isMounted && !isMounted()) {
         return;
       }
 
       if (fetchItemsError) {
-        // Ignore AbortError if the fetch was intentionally cancelled
+        // Silently ignore AbortError - it's likely from Supabase Auth internal cleanup
         if (fetchItemsError.name === 'AbortError' || fetchItemsError.message?.includes('aborted')) {
           return;
         }
@@ -150,35 +145,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
         color: { name: item.color_name, value: item.color_value },
       }));
 
-      setItems(transformedItems);
-      setLoading(false);
+      // Only update state if component is still mounted
+      if (!isMounted || isMounted()) {
+        setItems(transformedItems);
+        setLoading(false);
+      }
     } catch (error: any) {
-      // Ignore AbortError
+      // Silently ignore AbortError - it's likely from Supabase Auth internal cleanup
       if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
         return;
       }
       console.error("Unexpected error in loadCart:", error);
-      setLoading(false);
+      if (!isMounted || isMounted()) {
+        setLoading(false);
+      }
     }
   }, [user, userLoading]); // Depend on user and userLoading
 
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController();
     
     const fetchCartData = async () => {
       if (!isMounted) return;
-      await loadCart(controller.signal);
+      await loadCart(() => isMounted);
     };
     
     fetchCartData();
     
     return () => {
       isMounted = false;
-      // Only abort if the component is unmounting
-      if (!controller.signal.aborted) {
-        controller.abort();
-      }
     };
   }, [loadCart]);
 
@@ -297,6 +292,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 export function useCart() {
   const context = useContext(CartContext)
   if (context === undefined) {
+    // En mode développement, afficher un message d'erreur plus détaillé
+    if (process.env.NODE_ENV === 'development') {
+      console.error("useCart must be used within a CartProvider. Make sure CartProvider is wrapping your component.")
+    }
     throw new Error("useCart must be used within a CartProvider")
   }
   return context

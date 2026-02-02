@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card"
 import { useCart } from "@/context/cart-context"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabaseClient"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { toast } from 'sonner' // Importation de toast de sonner
@@ -43,7 +44,7 @@ export default function CheckoutPage() {
     address: "",
     city: "",
     zipCode: "",
-    country: "",
+    country: "Mali", // Valeur par défaut
     phone: "",
     cardNumber: "",
     cardName: "",
@@ -154,7 +155,7 @@ export default function CheckoutPage() {
   const validateShippingForm = (): boolean => {
     let newErrors: Record<string, string | null> = {}
     const fields: Array<keyof typeof formData> = [
-      "email", "firstName", "lastName", "address", "city", "zipCode", "country", "phone"
+      "email", "firstName", "lastName", "address", "city", "zipCode", "phone"
     ]
     fields.forEach(field => {
       newErrors[field as string] = validateField(field as string, formData[field])
@@ -176,8 +177,21 @@ export default function CheckoutPage() {
   }
 
   const handleSubmitShipping = () => {
-    if (validateShippingForm()) {
+    const isValid = validateShippingForm()
+    if (isValid) {
       setCurrentStep("payment")
+    } else {
+      // Afficher un message d'erreur si la validation échoue
+      toast.error("Veuillez remplir tous les champs obligatoires correctement")
+      // Faire défiler vers le premier champ en erreur
+      const firstErrorField = Object.keys(errors).find(key => errors[key] !== null)
+      if (firstErrorField) {
+        const element = document.getElementById(firstErrorField)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          element.focus()
+        }
+      }
     }
   }
 
@@ -187,36 +201,93 @@ export default function CheckoutPage() {
         return;
     }
 
+    if (!user) {
+        toast.error("Vous devez être connecté pour passer une commande.");
+        router.push('/account');
+        return;
+    }
+
     setIsProcessingOrder(true);
     try {
-        const response = await fetch('/api/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                formData,
-                cartItems: items,
+        // Créer la commande directement avec Supabase depuis le client
+        // 1. Créer la commande principale
+        const { data: orderData, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+                user_id: user.id,
+                customer_details: {
+                    name: `${formData.firstName} ${formData.lastName}`,
+                    email: formData.email,
+                    phone: formData.phone,
+                    address: `${formData.address}, ${formData.zipCode} ${formData.city}, ${formData.country}`,
+                },
                 total: total,
-                shipping: shipping,
-                tax: tax,
-            }),
-        });
+                status: 'pending',
+                payment_status: 'pending',
+                payment_method: 'Credit Card',
+            })
+            .select()
+            .single();
 
-        const result = await response.json();
-
-        if (response.ok) {
-            toast.success("Commande passée avec succès !");
-            clearCart(); // Vider le panier
-            if (typeof window !== "undefined") {
-              localStorage.removeItem("checkout_form_data"); // Nettoyer le localStorage
-            }
-            setCurrentStep("confirmation");
-        } else {
-            toast.error(result.message || "Échec de la commande. Veuillez réessayer.");
-            console.error("Order creation failed:", result);
+        if (orderError || !orderData) {
+            console.error('Erreur lors de la création de la commande:', orderError);
+            toast.error(orderError?.message || "Erreur lors de la création de la commande.");
+            return;
         }
-    } catch (error) {
+
+        const orderId = orderData.id;
+
+        // 2. Créer les articles de la commande
+        const orderItemsToInsert = items.map((item) => ({
+            order_id: orderId,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            price: item.price,
+            size: item.size,
+            color: item.color.name || item.color,
+            image: item.image || null,
+        }));
+
+        const { error: orderItemsError } = await supabase
+            .from('order_items')
+            .insert(orderItemsToInsert);
+
+        if (orderItemsError) {
+            console.error('Erreur lors de la création des articles:', orderItemsError);
+            // Annuler la commande en cas d'échec
+            await supabase.from('orders').delete().eq('id', orderId);
+            toast.error("Erreur lors de la création des articles de la commande.");
+            return;
+        }
+
+        // 3. Décrémenter le stock des produits
+        for (const item of items) {
+            const { data: productData, error: productError } = await supabase
+                .from('products')
+                .select('stock')
+                .eq('id', item.product_id)
+                .single();
+
+            if (productError || !productData) {
+                console.error(`Erreur stock produit ${item.product_id}:`, productError);
+                continue;
+            }
+
+            const newStock = productData.stock - item.quantity;
+            await supabase
+                .from('products')
+                .update({ stock: newStock })
+                .eq('id', item.product_id);
+        }
+
+        // Succès !
+        toast.success("Commande passée avec succès !");
+        clearCart(); // Vider le panier
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("checkout_form_data"); // Nettoyer le localStorage
+        }
+        setCurrentStep("confirmation");
+    } catch (error: any) {
         toast.error("Une erreur inattendue est survenue.");
         console.error("Unexpected error during order creation:", error);
     } finally {
@@ -390,10 +461,18 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.firstName}
                               onChange={(e) => handleInputChange("firstName", e.target.value)}
+                              onBlur={() => handleBlur("firstName")}
                               autoComplete="given-name"
                               required
                               aria-required="true"
+                              aria-invalid={!!errors.firstName}
+                              className={errors.firstName ? "border-destructive" : ""}
                             />
+                            {errors.firstName && (
+                              <p className="text-xs text-destructive mt-1" role="alert">
+                                {errors.firstName}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="lastName">
@@ -405,10 +484,18 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.lastName}
                               onChange={(e) => handleInputChange("lastName", e.target.value)}
+                              onBlur={() => handleBlur("lastName")}
                               autoComplete="family-name"
                               required
                               aria-required="true"
+                              aria-invalid={!!errors.lastName}
+                              className={errors.lastName ? "border-destructive" : ""}
                             />
+                            {errors.lastName && (
+                              <p className="text-xs text-destructive mt-1" role="alert">
+                                {errors.lastName}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div>
@@ -421,10 +508,18 @@ export default function CheckoutPage() {
                             type="text"
                             value={formData.address}
                             onChange={(e) => handleInputChange("address", e.target.value)}
+                            onBlur={() => handleBlur("address")}
                             autoComplete="street-address"
                             required
                             aria-required="true"
+                            aria-invalid={!!errors.address}
+                            className={errors.address ? "border-destructive" : ""}
                           />
+                          {errors.address && (
+                            <p className="text-xs text-destructive mt-1" role="alert">
+                              {errors.address}
+                            </p>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -437,10 +532,18 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.city}
                               onChange={(e) => handleInputChange("city", e.target.value)}
+                              onBlur={() => handleBlur("city")}
                               autoComplete="address-level2"
                               required
                               aria-required="true"
+                              aria-invalid={!!errors.city}
+                              className={errors.city ? "border-destructive" : ""}
                             />
+                            {errors.city && (
+                              <p className="text-xs text-destructive mt-1" role="alert">
+                                {errors.city}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="zipCode">
@@ -452,10 +555,18 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.zipCode}
                               onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                              onBlur={() => handleBlur("zipCode")}
                               autoComplete="postal-code"
                               required
                               aria-required="true"
+                              aria-invalid={!!errors.zipCode}
+                              className={errors.zipCode ? "border-destructive" : ""}
                             />
+                            {errors.zipCode && (
+                              <p className="text-xs text-destructive mt-1" role="alert">
+                                {errors.zipCode}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div>
@@ -468,14 +579,23 @@ export default function CheckoutPage() {
                             type="tel"
                             value={formData.phone}
                             onChange={(e) => handleInputChange("phone", e.target.value)}
+                            onBlur={() => handleBlur("phone")}
                             autoComplete="tel"
                             required
                             aria-required="true"
-                            aria-describedby="phone-hint"
+                            aria-invalid={!!errors.phone}
+                            aria-describedby={errors.phone ? "phone-error" : "phone-hint"}
+                            className={errors.phone ? "border-destructive" : ""}
                           />
-                          <p id="phone-hint" className="text-xs text-muted-foreground mt-1">
-                            Pour vous contacter concernant votre commande
-                          </p>
+                          {errors.phone ? (
+                            <p id="phone-error" className="text-xs text-destructive mt-1" role="alert">
+                              {errors.phone}
+                            </p>
+                          ) : (
+                            <p id="phone-hint" className="text-xs text-muted-foreground mt-1">
+                              Pour vous contacter concernant votre commande
+                            </p>
+                          )}
                         </div>
                         <Button
                           size="lg"

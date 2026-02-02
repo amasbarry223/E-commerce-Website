@@ -50,10 +50,20 @@ export function useOrders(statusFilter?: OrderStatus) {
   const fetchOrders = async () => {
     try {
       setLoading(true)
+      // Optimisation : sélectionner seulement les champs nécessaires
       let query = supabase
         .from('orders')
         .select(`
-          *,
+          id,
+          user_id,
+          customer_details,
+          total,
+          status,
+          payment_status,
+          payment_method,
+          tracking_number,
+          created_at,
+          updated_at,
           order_items (
             id,
             product_id,
@@ -62,9 +72,11 @@ export function useOrders(statusFilter?: OrderStatus) {
             size,
             color,
             image,
-                      products (name)
-                    )        `)
+            products (name)
+          )
+        `)
         .order('created_at', { ascending: false })
+        .limit(100) // Limiter à 100 commandes pour améliorer les performances
 
       if (statusFilter && statusFilter !== 'ALL') {
         query = query.eq('status', statusFilter)
