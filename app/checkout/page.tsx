@@ -198,6 +198,15 @@ export default function CheckoutPage() {
   const handleSubmitPayment = async () => {
     if (!validatePaymentForm()) {
         toast.error("Veuillez corriger les erreurs de paiement.");
+        // Faire défiler vers le premier champ en erreur
+        const firstErrorField = Object.keys(errors).find(key => errors[key] !== null)
+        if (firstErrorField) {
+          const element = document.getElementById(firstErrorField)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            element.focus()
+          }
+        }
         return;
     }
 
@@ -631,16 +640,25 @@ export default function CheckoutPage() {
                             type="text"
                             value={formData.cardNumber}
                             onChange={(e) => handleInputChange("cardNumber", e.target.value)}
+                            onBlur={() => handleBlur("cardNumber")}
                             placeholder="1234 5678 9012 3456"
                             maxLength={19}
                             autoComplete="cc-number"
                             required
                             aria-required="true"
-                            aria-describedby="cardNumber-hint"
+                            aria-invalid={!!errors.cardNumber}
+                            aria-describedby={errors.cardNumber ? "cardNumber-error" : "cardNumber-hint"}
+                            className={errors.cardNumber ? "border-destructive" : ""}
                           />
-                          <p id="cardNumber-hint" className="text-xs text-muted-foreground mt-1">
-                            Entrez les 16 chiffres de votre carte
-                          </p>
+                          {errors.cardNumber ? (
+                            <p id="cardNumber-error" className="text-xs text-destructive mt-1" role="alert">
+                              {errors.cardNumber}
+                            </p>
+                          ) : (
+                            <p id="cardNumber-hint" className="text-xs text-muted-foreground mt-1">
+                              Entrez les 16 chiffres de votre carte
+                            </p>
+                          )}
                         </div>
                         <div>
                           <Label htmlFor="cardName">
@@ -652,10 +670,19 @@ export default function CheckoutPage() {
                             type="text"
                             value={formData.cardName}
                             onChange={(e) => handleInputChange("cardName", e.target.value)}
+                            onBlur={() => handleBlur("cardName")}
                             autoComplete="cc-name"
                             required
                             aria-required="true"
+                            aria-invalid={!!errors.cardName}
+                            aria-describedby={errors.cardName ? "cardName-error" : undefined}
+                            className={errors.cardName ? "border-destructive" : ""}
                           />
+                          {errors.cardName && (
+                            <p id="cardName-error" className="text-xs text-destructive mt-1" role="alert">
+                              {errors.cardName}
+                            </p>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -668,12 +695,21 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.expiryDate}
                               onChange={(e) => handleInputChange("expiryDate", e.target.value)}
+                              onBlur={() => handleBlur("expiryDate")}
                               placeholder="MM/AA"
                               maxLength={5}
                               autoComplete="cc-exp"
                               required
                               aria-required="true"
+                              aria-invalid={!!errors.expiryDate}
+                              aria-describedby={errors.expiryDate ? "expiryDate-error" : undefined}
+                              className={errors.expiryDate ? "border-destructive" : ""}
                             />
+                            {errors.expiryDate && (
+                              <p id="expiryDate-error" className="text-xs text-destructive mt-1" role="alert">
+                                {errors.expiryDate}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="cvv">
@@ -685,16 +721,25 @@ export default function CheckoutPage() {
                               type="text"
                               value={formData.cvv}
                               onChange={(e) => handleInputChange("cvv", e.target.value)}
+                              onBlur={() => handleBlur("cvv")}
                               placeholder="123"
-                              maxLength={3}
+                              maxLength={4}
                               autoComplete="cc-csc"
                               required
                               aria-required="true"
-                              aria-describedby="cvv-hint"
+                              aria-invalid={!!errors.cvv}
+                              aria-describedby={errors.cvv ? "cvv-error" : "cvv-hint"}
+                              className={errors.cvv ? "border-destructive" : ""}
                             />
-                            <p id="cvv-hint" className="text-xs text-muted-foreground mt-1">
-                              3 chiffres au dos de la carte
-                            </p>
+                            {errors.cvv ? (
+                              <p id="cvv-error" className="text-xs text-destructive mt-1" role="alert">
+                                {errors.cvv}
+                              </p>
+                            ) : (
+                              <p id="cvv-hint" className="text-xs text-muted-foreground mt-1">
+                                3 chiffres au dos de la carte
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground pt-4">

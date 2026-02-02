@@ -7,17 +7,53 @@ import { Heart, ShoppingBag, X, ArrowRight } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { products } from "@/lib/products"
-
-// Demo wishlist items
-const initialWishlistIds = [1, 3, 6]
+import { useAuth } from "@/context/auth-context" // Import useAuth
+import { useWishlist } from "@/hooks/useWishlist" // Import useWishlist
 
 export default function WishlistPage() {
-  const [wishlistIds, setWishlistIds] = useState(initialWishlistIds)
-  const wishlistItems = products.filter((product) => wishlistIds.includes(product.id))
+  const { user, loading: authLoading } = useAuth()
+  const { wishlist, loading: wishlistLoading, error, removeFromWishlist } = useWishlist(user?.id)
 
-  const removeFromWishlist = (productId: number) => {
-    setWishlistIds((prev) => prev.filter((id) => id !== productId))
+  const isLoading = authLoading || wishlistLoading;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Chargement de la liste de souhaits...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main id="main-content" className="flex-1">
+          <div className="container mx-auto px-4 py-6 lg:py-12 flex flex-col items-center justify-center">
+            <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+              Accès refusé
+            </h1>
+            <p className="text-muted-foreground mb-6 max-w-md text-center">
+              Vous devez être connecté pour afficher votre liste de souhaits.
+            </p>
+            <Link href="/login">
+              <Button size="lg" className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-8">
+                Se connecter
+              </Button>
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-red-500">Erreur lors du chargement de la liste de souhaits: {error}</p>
+      </div>
+    );
   }
 
   return (
@@ -29,32 +65,32 @@ export default function WishlistPage() {
             Ma liste de souhaits
           </h1>
           <p className="text-muted-foreground mb-8">
-            {wishlistItems.length} {wishlistItems.length === 1 ? "article" : "articles"}
+            {wishlist.length} {wishlist.length === 1 ? "article" : "articles"}
           </p>
 
-          {wishlistItems.length === 0 ? (
+          {wishlist.length === 0 ? (
             <EmptyWishlist />
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-              {wishlistItems.map((product) => (
-                <div key={product.id} className="group">
+              {wishlist.map((item) => (
+                <div key={item.product.id} className="group">
                   <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-secondary mb-3">
-                    <Link href={`/product/${product.id}`}>
+                    <Link href={`/product/${item.product.id}`}>
                       <Image
-                        src={product.images[0] || "/placeholder.svg"}
-                        alt={product.name}
+                        src={item.product.images[0] || "/placeholder.svg"}
+                        alt={item.product.name}
                         fill
                         className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
                       />
                     </Link>
-                    {product.isNew && (
+                    {item.product.isNew && (
                       <span className="absolute top-3 left-3 px-2 py-1 text-[10px] font-semibold tracking-wider uppercase bg-accent text-accent-foreground rounded-full">
                         Nouveau
                       </span>
                     )}
                     <button
                       type="button"
-                      onClick={() => removeFromWishlist(product.id)}
+                      onClick={() => removeFromWishlist(item.product.id)}
                       className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
                       aria-label="Retirer de la liste de souhaits"
                     >
@@ -62,20 +98,20 @@ export default function WishlistPage() {
                     </button>
                   </div>
                   <div>
-                    <Link href={`/product/${product.id}`}>
+                    <Link href={`/product/${item.product.id}`}>
                       <h3 className="font-medium text-foreground text-sm lg:text-base mb-1 truncate hover:text-accent transition-colors">
-                        {product.name}
+                        {item.product.name}
                       </h3>
                     </Link>
                     <div className="flex items-center gap-2 mb-3">
-                      <p className="text-foreground font-semibold">FCFA {product.price}</p>
-                      {product.originalPrice && (
+                      <p className="text-foreground font-semibold">FCFA {item.product.price}</p>
+                      {item.product.originalPrice && (
                         <p className="text-muted-foreground text-sm line-through">
-                          FCFA {product.originalPrice}
+                          FCFA {item.product.originalPrice}
                         </p>
                       )}
                     </div>
-                    <Link href={`/product/${product.id}`}>
+                    <Link href={`/product/${item.product.id}`}>
                       <Button
                         size="sm"
                         className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-full text-xs"

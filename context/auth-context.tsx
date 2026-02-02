@@ -8,6 +8,8 @@ import type { User as SupabaseUser } from "@supabase/supabase-js"
 export interface User extends SupabaseUser {
   role: string
   name: string | null
+  phone: string | null // Ajout du champ phone
+  email_notifications_enabled: boolean // Ajout du champ pour les notifications
 }
 
 interface AuthContextType {
@@ -16,6 +18,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
+  updateUserProfile: (updates: { name?: string | null; phone?: string | null }) => Promise<{ success: boolean; error?: string }> // Nouvelle fonction
+  updateEmailNotifications: (enabled: boolean) => Promise<{ success: boolean; error?: string }> // Nouvelle fonction
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -33,14 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, name')
+          .select('role, name, phone, email_notifications_enabled') // Récupérer le phone et les notifications
           .eq('id', session.user.id)
           .single()
 
         setUser({
           ...session.user,
           role: profile?.role || 'customer',
-          name: profile?.name || session.user.user_metadata.name || null
+          name: profile?.name || session.user.user_metadata.name || null,
+          phone: profile?.phone || null,
+          email_notifications_enabled: profile?.email_notifications_enabled ?? true, // Définir les notifications
         })
       }
       setLoading(false)
@@ -53,14 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('role, name')
+            .select('role, name, phone, email_notifications_enabled') // Récupérer le phone et les notifications
             .eq('id', session.user.id)
             .single()
 
           setUser({
             ...session.user,
             role: profile?.role || 'customer',
-            name: profile?.name || session.user.user_metadata.name || null
+            name: profile?.name || session.user.user_metadata.name || null,
+            phone: profile?.phone || null,
+            email_notifications_enabled: profile?.email_notifications_enabled ?? true, // Définir les notifications
           })
         } else {
           setUser(null)
@@ -106,7 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: profileError } = await supabase.from('profiles').insert({
       id: authData.user.id,
       name: name || null,
-      role: 'customer' // Rôle par défaut
+      role: 'customer',
+      phone: null, // Initialiser le phone à null lors de l'inscription
+      email_notifications_enabled: true, // Initialiser les notifications à true par défaut
     })
 
     if (profileError) {
@@ -123,8 +133,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  const updateUserProfile = async (updates: { name?: string | null; phone?: string | null }) => {
+    if (!user) {
+      return { success: false, error: "Utilisateur non authentifié." };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select('name, phone, role, email_notifications_enabled') // Inclure email_notifications_enabled
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setUser((prevUser) => {
+        if (!prevUser) return null;
+        return {
+          ...prevUser,
+          name: data.name,
+          phone: data.phone,
+          role: data.role,
+          email_notifications_enabled: data.email_notifications_enabled, // Mettre à jour aussi
+        };
+      });
+      return { success: true };
+    } catch (err: any) {
+      console.error("Error updating user profile:", err);
+      return { success: false, error: err.message || "Erreur lors de la mise à jour du profil." };
+    }
+  };
+
+  const updateEmailNotifications = async (enabled: boolean) => {
+    if (!user) {
+      return { success: false, error: "Utilisateur non authentifié." };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ email_notifications_enabled: enabled })
+        .eq('id', user.id)
+        .select('name, phone, role, email_notifications_enabled')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setUser((prevUser) => {
+        if (!prevUser) return null;
+        return {
+          ...prevUser,
+          email_notifications_enabled: data.email_notifications_enabled,
+        };
+      });
+      return { success: true };
+    } catch (err: any) {
+      console.error("Error updating email notifications:", err);
+      return { success: false, error: err.message || "Erreur lors de la mise à jour des préférences de notification." };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUserProfile, updateEmailNotifications }}>
       {children}
     </AuthContext.Provider>
   )
