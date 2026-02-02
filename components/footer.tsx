@@ -7,28 +7,17 @@ import { Facebook, Instagram, Twitter, Youtube } from "lucide-react"
 const footerLinks = {
   shop: [
     { name: "Tous les produits", href: "/shop" },
-    { name: "Vestes", href: "/shop?category=JACKETS" },
-    { name: "T-Shirts", href: "/shop?category=T-SHIRT" },
-    { name: "Chaussures", href: "/shop?category=SHOES" },
     { name: "Nouveautés", href: "/shop?filter=new" },
   ],
   company: [
-    { name: "À propos", href: "#" },
-    { name: "Carrières", href: "#" },
-    { name: "Presse", href: "#" },
-    { name: "Blog", href: "#" },
+    { name: "À propos", href: "/about" },
   ],
   support: [
-    { name: "Nous contacter", href: "#" },
-    { name: "FAQ", href: "#" },
-    { name: "Livraison", href: "#" },
-    { name: "Retours", href: "#" },
-    { name: "Guide des tailles", href: "#" },
+    { name: "Nous contacter", href: "/contact" },
   ],
   legal: [
-    { name: "Politique de confidentialité", href: "#" },
-    { name: "Conditions d'utilisation", href: "#" },
-    { name: "Politique des cookies", href: "#" },
+    { name: "Politique de confidentialité", href: "/privacy" },
+    { name: "Conditions d'utilisation", href: "/terms" },
   ],
 }
 
